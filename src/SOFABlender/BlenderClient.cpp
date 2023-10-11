@@ -61,6 +61,11 @@ void BlenderClient::handleEvent(sofa::core::objectmodel::Event* event)
 
 void BlenderClient::sendData()
 {
+    if (!this->isComponentStateValid())
+    {
+        return;
+    }
+
     std::stringstream message;
 
     message << m_nbIterations << " ";
