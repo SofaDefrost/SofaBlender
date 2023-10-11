@@ -29,8 +29,18 @@ def handle_client(client_socket):
             data = client_socket.recv(4096)
             if not data:
                 break
-            # Process the received data
-            print(f"Received data: {data.decode('utf-8')}")
+
+            s = data.decode('utf-8')
+            if "<SOFABlender>" in s:
+
+                while True:
+                    data = client_socket.recv(4096)
+                    s = data.decode('utf-8')
+                    print(f"Received data: {s}")
+                    if "</SOFABlender>" in s:
+                        break
+
+
         except KeyboardInterrupt:
             global is_server_connected
             is_server_connected = False

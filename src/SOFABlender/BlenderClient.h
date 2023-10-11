@@ -5,6 +5,9 @@
 #define BOOST_DATE_TIME_NO_LIB
 #include <boost/asio.hpp>
 
+#include <SOFABlender/json/json.hpp>
+
+
 namespace sofablender
 {
 
@@ -32,6 +35,14 @@ private:
     std::size_t m_nbIterations {};
 
     void onBeginAnimationStep();
+
+    void sendHeader();
+    void sendMesh(const sofa::core::visual::VisualModel* visualModel);
+    void sendFooter();
+    void sendSerializedMeshes(const std::string& serializedMeshes);
+    void convertMeshesToJSON(
+        const std::vector<sofa::component::visual::VisualModelImpl*>& visualModels,
+        nlohmann::json& jsonMessage);
 };
 
 }

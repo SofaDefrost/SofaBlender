@@ -1,7 +1,10 @@
-﻿#include <sofa/core/ObjectFactory.h>
+﻿#include <sofa/component/visual/VisualModelImpl.h>
+#include <sofa/core/ObjectFactory.h>
 #include <SOFABlender/BlenderClient.h>
 #include <sofa/simulation/AnimateBeginEvent.h>
 #include <sofa/core/visual/VisualModel.h>
+#include <sofa/helper/ScopedAdvancedTimer.h>
+#include <SOFABlender/json/json.hpp>
 
 namespace sofablender
 {
@@ -59,6 +62,62 @@ void BlenderClient::handleEvent(sofa::core::objectmodel::Event* event)
     }
 }
 
+void BlenderClient::sendHeader()
+{
+    std::stringstream header;
+    header << "<SOFABlender>";
+
+    boost::asio::write(m_socket, boost::asio::buffer(header.str()));
+}
+
+void BlenderClient::sendMesh(const sofa::core::visual::VisualModel* visualModel)
+{
+    std::stringstream serializedMesh;
+
+    serializedMesh << "|";
+    serializedMesh << visualModel->getName();
+    serializedMesh << "%";
+
+    boost::asio::write(m_socket, boost::asio::buffer(serializedMesh.str()));
+}
+
+void BlenderClient::sendFooter()
+{
+    boost::asio::write(m_socket, boost::asio::buffer("</SOFABlender>"));
+}
+
+void BlenderClient::sendSerializedMeshes(const std::string& serializedMeshes)
+{
+    std::size_t pos = 0;
+    static constexpr std::size_t chunkSize = 4096;
+    while (pos < serializedMeshes.length())
+    {
+        const std::string chunk = serializedMeshes.substr(pos, chunkSize);
+        boost::asio::write(m_socket, boost::asio::buffer(chunk));
+        pos += chunkSize;
+    }
+}
+
+void BlenderClient::convertMeshesToJSON(const std::vector<sofa::component::visual::VisualModelImpl*>& visualModels, nlohmann::json& jsonMessage)
+{
+    nlohmann::json jsonMeshes = nlohmann::json::array();
+
+    for (const auto& visualModel : visualModels)
+    {
+        if (visualModel->d_enable.getValue())
+        {
+            nlohmann::json jsonMesh;
+            jsonMesh["name"] = visualModel->getName();
+            jsonMesh["vertices"] = nlohmann::json(visualModel->m_positions.getValue());
+            jsonMesh["faces"] = nlohmann::json(visualModel->getTriangles());
+            jsonMeshes.push_back(jsonMesh);
+        }
+    }
+
+    jsonMessage["iteration"] = m_nbIterations;
+    jsonMessage["meshes"] = jsonMeshes;
+}
+
 void BlenderClient::sendData()
 {
     if (!this->isComponentStateValid())
@@ -66,16 +125,17 @@ void BlenderClient::sendData()
         return;
     }
 
-    std::stringstream message;
+    SCOPED_TIMER("SendDataToBlender");
 
-    message << m_nbIterations << " ";
+    const auto visualModels = this->getContext()->getObjects<sofa::component::visual::VisualModelImpl>(sofa::core::objectmodel::BaseContext::SearchDown);
+    sendHeader();
+    {
+        nlohmann::json jsonMessage;
+        convertMeshesToJSON(visualModels, jsonMessage);
 
-    const auto visualModels = this->getContext()->getObjects<sofa::core::visual::VisualModel>(sofa::core::objectmodel::BaseContext::SearchDown);
-    message << visualModels.size();
-
-
-
-    boost::asio::write(m_socket, boost::asio::buffer(message.str()));
+        sendSerializedMeshes(jsonMessage.dump());
+    }
+    sendFooter();
 }
 
 void BlenderClient::onBeginAnimationStep()
