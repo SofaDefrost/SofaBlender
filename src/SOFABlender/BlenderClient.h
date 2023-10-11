@@ -18,6 +18,9 @@ public:
     void cleanup() override;
     void handleEvent( sofa::core::objectmodel::Event* event ) override;
 
+    sofa::Data<std::string> d_host;
+    sofa::Data<unsigned int> d_port;
+
 private:
     boost::asio::io_service m_ioService;
     boost::asio::ip::tcp::socket m_socket;

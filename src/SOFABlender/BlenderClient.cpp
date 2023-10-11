@@ -9,7 +9,11 @@ int BlenderClientClass = sofa::core::RegisterObject("Client sending data to a Bl
     .add< BlenderClient >();
 
 BlenderClient::BlenderClient()
-    : m_socket(m_ioService)
+    : d_host(initData(&d_host, std::string("127.0.0.1"), "host",
+                      "Network address of the device running the server"))
+    , d_port(initData(&d_port, 12345u, "port",
+                      "Numeric value (ranging from 0 to 65535) identifying a communication channel with the server"))
+    , m_socket(m_ioService)
 {
     f_listening.setValue(true);
 }
@@ -21,7 +25,7 @@ void BlenderClient::init()
     try
     {
         m_serverEndpoint = std::make_unique<boost::asio::ip::tcp::endpoint>(
-            boost::asio::ip::address::from_string("127.0.0.1"), 12345);
+            boost::asio::ip::address::from_string(d_host.getValue()), d_port.getValue());
 
         m_socket.connect(*m_serverEndpoint);
     }
