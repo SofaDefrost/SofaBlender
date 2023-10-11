@@ -1,17 +1,20 @@
 <Node name="root">
     <Node name="plugins">
+        <RequiredPlugin name="SOFABlender"/> <!-- Needed to use components [BlenderClient] -->
         <RequiredPlugin name="Sofa.Component.Constraint.Projective"/> <!-- Needed to use components [FixedConstraint] -->
-        <RequiredPlugin name="Sofa.Component.LinearSolver.Direct"/> <!-- Needed to use components [SVDLinearSolver] -->
+        <RequiredPlugin name="Sofa.Component.Engine.Select"/> <!-- Needed to use components [BoxROI] -->
+        <RequiredPlugin name="Sofa.Component.LinearSolver.Direct"/> <!-- Needed to use components [EigenSimplicialLDLT] -->
+        <RequiredPlugin name="Sofa.Component.Mapping.Linear"/> <!-- Needed to use components [IdentityMapping] -->
         <RequiredPlugin name="Sofa.Component.Mass"/> <!-- Needed to use components [UniformMass] -->
         <RequiredPlugin name="Sofa.Component.ODESolver.Backward"/> <!-- Needed to use components [EulerImplicitSolver] -->
+        <RequiredPlugin name="Sofa.Component.SceneUtility"/> <!-- Needed to use components [InfoComponent] -->
         <RequiredPlugin name="Sofa.Component.SolidMechanics.FEM.Elastic"/> <!-- Needed to use components [HexahedronFEMForceField] -->
         <RequiredPlugin name="Sofa.Component.StateContainer"/> <!-- Needed to use components [MechanicalObject] -->
+        <RequiredPlugin name="Sofa.Component.Topology.Container.Dynamic"/> <!-- Needed to use components [TetrahedronSetGeometryAlgorithms,TetrahedronSetTopologyContainer,TetrahedronSetTopologyModifier,TriangleSetGeometryAlgorithms,TriangleSetTopologyContainer,TriangleSetTopologyModifier] -->
         <RequiredPlugin name="Sofa.Component.Topology.Container.Grid"/> <!-- Needed to use components [RegularGridTopology] -->
+        <RequiredPlugin name="Sofa.Component.Topology.Mapping"/> <!-- Needed to use components [Hexa2TetraTopologicalMapping,Tetra2TriangleTopologicalMapping] -->
         <RequiredPlugin name="Sofa.Component.Visual"/> <!-- Needed to use components [VisualStyle] -->
-        <RequiredPlugin name="Sofa.Component.Engine.Select"/> <!-- Needed to use components [BoxROI] -->
-        <RequiredPlugin name="Sofa.Component.LinearSolver.Iterative"/> <!-- Needed to use components [CGLinearSolver] -->
-        <RequiredPlugin name="Sofa.Component.LinearSolver.Preconditioner"/> <!-- Needed to use components [BlockJacobiPreconditioner] -->
-        <RequiredPlugin name="SOFABlender"/> <!-- Needed to use components [BlenderClient] -->
+        <RequiredPlugin name="Sofa.GL.Component.Rendering3D"/> <!-- Needed to use components [OglModel] -->
     </Node>
 
     <VisualStyle displayFlags="showBehaviorModels showForceFields" />
@@ -29,4 +32,19 @@
     <RegularGridTopology name="grid" nx="4" ny="4" nz="20" xmin="-9" xmax="-6" ymin="0" ymax="3" zmin="0" zmax="19" />
     <BoxROI name="box" box="-10 -1 -0.0001  -5 4 0.0001"/>
     <FixedConstraint indices="@box.indices" />
+
+    <Node name="Tetra">
+        <TetrahedronSetTopologyContainer name="Container"/>
+        <TetrahedronSetTopologyModifier name="Modifier"/>
+        <TetrahedronSetGeometryAlgorithms template="Vec3" name="GeomAlgo"/>
+        <Hexa2TetraTopologicalMapping input="@../grid" output="@Container"/>
+        <Node name="Visualization">
+            <TriangleSetTopologyContainer name="Container"/>
+            <TriangleSetTopologyModifier name="Modifier"/>
+            <TriangleSetGeometryAlgorithms template="Vec3" name="GeomAlgo"/>
+            <Tetra2TriangleTopologicalMapping input="@../Container" output="@Container" flipNormals="1" />
+            <OglModel name="Visual" color="0.3 0.3 1 1"/>
+            <IdentityMapping input="@../../DoFs" output="@Visual"/>
+        </Node>
+    </Node>
 </Node>
