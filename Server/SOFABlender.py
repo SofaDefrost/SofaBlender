@@ -13,12 +13,35 @@ from bpy.types import AddonPreferences, Operator
 
 import socket
 import threading
+import json
 
 # Create a socket object
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 is_server_started = False
 is_server_connected = False
+
+
+def read_json(json_data):
+    # Find the index of the last '}'
+    last_brace_index = json_data.rfind('}')
+
+    # Check if '}' was found
+    if last_brace_index != -1:
+        # Slice the string to keep only the part before the last '}'
+        json_data = json_data[:last_brace_index + 1]
+
+    try:
+        data = json.loads(json_data)
+        iteration = data["iteration"]
+        print(f"Iteration #{iteration}")
+        meshes = data["meshes"]
+        for mesh in meshes:
+            name = mesh["name"]
+            print(f"Mesh name: {name}")
+
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON: {e} {json_data}")
 
 
 # Function to handle incoming client connections
@@ -30,16 +53,21 @@ def handle_client(client_socket):
             if not data:
                 break
 
-            s = data.decode('utf-8')
+            s = data.decode()
+            all_data = s
             if "<SOFABlender>" in s:
 
                 while True:
                     data = client_socket.recv(4096)
-                    s = data.decode('utf-8')
-                    print(f"Received data: {s}")
+                    s = data.decode()
+                    all_data += s
                     if "</SOFABlender>" in s:
-                        break
 
+                        all_data = all_data.replace('<SOFABlender>', '')
+                        all_data = all_data.replace('</SOFABlender>', '')
+                        read_json(all_data)
+
+                        break
 
         except KeyboardInterrupt:
             global is_server_connected
