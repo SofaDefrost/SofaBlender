@@ -98,6 +98,10 @@ void BlenderClient::convertMeshesToJSON(nlohmann::json& jsonMessage)
     }
 
     jsonMessage["iteration"] = m_nbIterations;
+    if (const auto& filename = this->getContext()->getRootContext()->getDefinitionSourceFileName(); !filename.empty())
+    {
+        jsonMessage["scene"] = filename;
+    }
 
     toJson(node, jsonMessage);
 }
