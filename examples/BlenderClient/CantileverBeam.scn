@@ -18,7 +18,7 @@
     </Node>
 
     <VisualStyle displayFlags="showBehaviorModels showForceFields" />
-    <BlenderClient/>
+    <BlenderClient printLog="true"/>
 
     <DefaultAnimationLoop name="animationLoop"/>
     <DefaultVisualManagerLoop name="visualLoop"/>

@@ -4,6 +4,7 @@
 #include <sofa/simulation/AnimateBeginEvent.h>
 #include <sofa/core/visual/VisualModel.h>
 #include <sofa/helper/ScopedAdvancedTimer.h>
+#include <sofa/simulation/Node.h>
 #include <SOFABlender/json/json.hpp>
 
 namespace sofablender
@@ -70,17 +71,6 @@ void BlenderClient::sendHeader()
     boost::asio::write(m_socket, boost::asio::buffer(header.str()));
 }
 
-void BlenderClient::sendMesh(const sofa::core::visual::VisualModel* visualModel)
-{
-    std::stringstream serializedMesh;
-
-    serializedMesh << "|";
-    serializedMesh << visualModel->getName();
-    serializedMesh << "%";
-
-    boost::asio::write(m_socket, boost::asio::buffer(serializedMesh.str()));
-}
-
 void BlenderClient::sendFooter()
 {
     boost::asio::write(m_socket, boost::asio::buffer("</SOFABlender>"));
@@ -98,24 +88,121 @@ void BlenderClient::sendSerializedMeshes(const std::string& serializedMeshes)
     }
 }
 
-void BlenderClient::convertMeshesToJSON(const std::vector<sofa::component::visual::VisualModelImpl*>& visualModels, nlohmann::json& jsonMessage)
+void BlenderClient::convertMeshesToJSON(nlohmann::json& jsonMessage)
 {
-    nlohmann::json jsonMeshes = nlohmann::json::array();
-
-    for (const auto& visualModel : visualModels)
+    auto* node = dynamic_cast<sofa::simulation::Node*>(this->getContext());
+    if (!node)
     {
-        if (visualModel->d_enable.getValue())
+        msg_error() << "Not a Node";
+        return;
+    }
+
+    jsonMessage["iteration"] = m_nbIterations;
+
+    toJson(node, jsonMessage);
+}
+
+void BlenderClient::toJson(sofa::simulation::Node* node, nlohmann::json& json)
+{
+    bool hasObjectsOrChildren = false;
+    nlohmann::json jsonMeshes = nlohmann::json::array();
+    for (const auto& object : node->object)
+    {
+        nlohmann::json jsonMesh;
+        bool hasPosition = false;
+        for (const auto& data : object->getDataFields())
         {
-            nlohmann::json jsonMesh;
-            jsonMesh["name"] = visualModel->getName();
-            jsonMesh["vertices"] = nlohmann::json(visualModel->m_positions.getValue());
-            jsonMesh["faces"] = nlohmann::json(visualModel->getTriangles());
+            const auto& name = data->getName();
+
+            if (name == "position")
+            {
+                const auto typeInfo = data->getValueTypeInfo();
+                if (typeInfo->Container() && !typeInfo->Text() && typeInfo->Scalar())
+                {
+                    hasPosition = true;
+
+                    const sofa::Size nbDoFsByNode = typeInfo->size();
+                    const sofa::Size nbElements = typeInfo->size(data->getValueVoidPtr()) / typeInfo->size();
+                    nlohmann::json position = nlohmann::json::array();
+                    for (unsigned int i = 0; i < nbElements; ++i)
+                    {
+                        nlohmann::json x = nlohmann::json::array();
+                        for (sofa::Size j = 0; j < std::min(nbDoFsByNode, 3u); ++j)
+                        {
+                            x.push_back(typeInfo->getScalarValue(data->getValueVoidPtr(), i * nbDoFsByNode + j));
+                        }
+                        for (sofa::Size j = std::min(nbDoFsByNode, 3u); j < 3; ++j)
+                        {
+                            x.push_back(0);
+                        }
+                        position.push_back(x);
+                    }
+                    jsonMesh["position"] = position;
+                }
+            }
+            else if (name == "faces" || name == "triangles" || name == "quads")
+            {
+                const auto typeInfo = data->getValueTypeInfo();
+                if (typeInfo->Container() && !typeInfo->Text() && typeInfo->Integer())
+                {
+                    const sofa::Size nbVerticesByFace = typeInfo->size();
+                    const sofa::Size nbFaces = typeInfo->size(data->getValueVoidPtr()) / typeInfo->size();
+
+                    nlohmann::json faces = nlohmann::json::array();
+                    for (sofa::Size i = 0; i < nbFaces; ++i)
+                    {
+                        nlohmann::json f = nlohmann::json::array();
+                        for (sofa::Size j = 0; j < nbVerticesByFace; ++j)
+                        {
+                            f.push_back(typeInfo->getIntegerValue(data->getValueVoidPtr(), i * nbVerticesByFace + j));
+                        }
+                        faces.push_back(f);
+                    }
+                    jsonMesh["faces"] = faces;
+                }
+            }
+        }
+
+        if (!jsonMesh.empty() && hasPosition)
+        {
+            jsonMesh["name"] = object->getName();
             jsonMeshes.push_back(jsonMesh);
         }
     }
 
-    jsonMessage["iteration"] = m_nbIterations;
-    jsonMessage["meshes"] = jsonMeshes;
+    if (!jsonMeshes.empty())
+    {
+        json["objects"] = jsonMeshes;
+        hasObjectsOrChildren = true;
+    }
+
+    const auto& children = node->getChildren();
+    if (!children.empty())
+    {
+        nlohmann::json childJsonArray = nlohmann::json::array();
+        for (const auto& child : children)
+        {
+            if (auto* childNode = dynamic_cast<sofa::simulation::Node*>(child))
+            {
+                nlohmann::json childJson;
+                toJson(childNode, childJson);
+                if (!childJson.empty())
+                {
+                    childJsonArray.push_back(childJson);
+                }
+            }
+        }
+        if (!childJsonArray.empty())
+        {
+            json["children"] = childJsonArray;
+            hasObjectsOrChildren = true;
+        }
+    }
+
+    if (hasObjectsOrChildren)
+    {
+        json["name"] = node->getName();
+    }
 }
 
 void BlenderClient::sendData()
@@ -127,12 +214,13 @@ void BlenderClient::sendData()
 
     SCOPED_TIMER("SendDataToBlender");
 
-    const auto visualModels = this->getContext()->getObjects<sofa::component::visual::VisualModelImpl>(sofa::core::objectmodel::BaseContext::SearchDown);
     sendHeader();
     {
         nlohmann::json jsonMessage;
-        convertMeshesToJSON(visualModels, jsonMessage);
+        convertMeshesToJSON(jsonMessage);
 
+        const auto jsonString = jsonMessage.dump();
+        msg_info() << jsonString;
         sendSerializedMeshes(jsonMessage.dump());
     }
     sendFooter();

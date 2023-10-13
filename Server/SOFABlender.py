@@ -35,10 +35,6 @@ def read_json(json_data):
         data = json.loads(json_data)
         iteration = data["iteration"]
         print(f"Iteration #{iteration}")
-        meshes = data["meshes"]
-        for mesh in meshes:
-            name = mesh["name"]
-            print(f"Mesh name: {name}")
 
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON: {e} {json_data}")
