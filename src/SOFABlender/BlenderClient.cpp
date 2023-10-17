@@ -205,7 +205,7 @@ void BlenderClient::toJson(sofa::simulation::Node* node, nlohmann::json& json)
 
     if (hasObjectsOrChildren)
     {
-        json["name"] = node->getName();
+        json["node_name"] = node->getName();
     }
 }
 
@@ -224,8 +224,7 @@ void BlenderClient::sendData()
         convertMeshesToJSON(jsonMessage);
 
         const auto jsonString = jsonMessage.dump();
-        msg_info() << jsonString;
-        sendSerializedMeshes(jsonMessage.dump());
+        sendSerializedMeshes(jsonString);
     }
     sendFooter();
 }
