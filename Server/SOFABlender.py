@@ -24,31 +24,32 @@ is_server_connected = False
 sofa_collection_name = 'SOFA_Collection'
 
 
-def process_object(object_data, collection):
+def process_object(object_data, collection, iteration):
     object_name = object_data["name"]
 
-    if collection.objects.find(object_name) == -1:
-        new_mesh = bpy.data.meshes.new(object_name)
-        # create
-        new_mesh.clear_geometry()
-        print("cleared mesh for", object_name)
-        if "position" in object_data and len(object_data["position"]) > 0:
-            if "faces" in object_data and len(object_data["faces"]) > 0:
-                print("make geometry for", object_name)
+    if "position" in object_data and len(object_data["position"]) > 0:
+        if "faces" in object_data and len(object_data["faces"]) > 0:
+
+            if collection.objects.find(object_name) == -1:
+                new_mesh = bpy.data.meshes.new(object_name)
+                new_mesh.clear_geometry()
+
                 new_mesh.from_pydata(object_data["position"], {}, object_data["faces"])
-                print("update geometry", object_name)
                 new_mesh.update()
-                print("end update geometry", object_name)
 
                 new_object = bpy.data.objects.new(object_name, new_mesh)
                 collection.objects.link(new_object)
-                print("created mesh for", object_name)
+            else:
+                obj = collection.objects[object_name]
 
-    # obj = collection.objects[object_name]
-    # meshes = obj.meshes[object_name]
+                pos_id = 0
+                for v in object_data["position"]:
+                    obj.data.vertices[pos_id].co = v
+                    obj.data.vertices[pos_id].keyframe_insert("co", frame=iteration)
+                    pos_id = pos_id + 1
 
 
-def process_node(node_data, collection):
+def process_node(node_data, collection, iteration):
 
     if "node_name" not in node_data:
         print("No name for this node")
@@ -63,11 +64,11 @@ def process_node(node_data, collection):
 
     if "objects" in node_data:
         for obj in node_data["objects"]:
-            process_object(obj, node_collection)
+            process_object(obj, node_collection, iteration)
 
     if "children" in node_data:
         for child in node_data["children"]:
-            process_node(child, node_collection)
+            process_node(child, node_collection, iteration)
 
 
 def read_json(json_data):
@@ -82,23 +83,19 @@ def read_json(json_data):
     try:
         data = json.loads(json_data)
         iteration = data["iteration"]
-        print(f"Iteration #{iteration}")
 
         bpy.context.scene.frame_start = 0
         bpy.context.scene.frame_end = iteration
 
-        if "scene" in data:
-            print(f'Scene: {data["scene"]}')
-
         if bpy.data.collections.find(sofa_collection_name) == -1:
-            print('Creating SOFA Collection')
+            print('[SOFABlender] Creating SOFA Collection')
             new_sofa_collection = bpy.data.collections.new(sofa_collection_name)
             bpy.context.scene.collection.children.link(new_sofa_collection)
 
-        process_node(data, bpy.data.collections[sofa_collection_name])
+        process_node(data, bpy.data.collections[sofa_collection_name], iteration)
 
     except json.JSONDecodeError as e:
-        print(f"Error decoding JSON: {e} {json_data}")
+        print(f"[SOFABlender] Error decoding JSON: {e} {json_data}")
 
 
 # Function to handle incoming client connections

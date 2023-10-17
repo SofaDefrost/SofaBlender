@@ -118,6 +118,8 @@ void BlenderClient::toJson(sofa::simulation::Node* node, nlohmann::json& json)
         {
             const auto& name = data->getName();
 
+            nlohmann::json faces = nlohmann::json::array();
+
             if (name == "position")
             {
                 const auto typeInfo = data->getValueTypeInfo();
@@ -152,7 +154,6 @@ void BlenderClient::toJson(sofa::simulation::Node* node, nlohmann::json& json)
                     const sofa::Size nbVerticesByFace = typeInfo->size();
                     const sofa::Size nbFaces = typeInfo->size(data->getValueVoidPtr()) / typeInfo->size();
 
-                    nlohmann::json faces = nlohmann::json::array();
                     for (sofa::Size i = 0; i < nbFaces; ++i)
                     {
                         nlohmann::json f = nlohmann::json::array();
@@ -162,8 +163,11 @@ void BlenderClient::toJson(sofa::simulation::Node* node, nlohmann::json& json)
                         }
                         faces.push_back(f);
                     }
-                    jsonMesh["faces"] = faces;
                 }
+            }
+            if (!faces.empty())
+            {
+                jsonMesh["faces"] = faces;
             }
         }
 
