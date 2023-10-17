@@ -83,7 +83,14 @@ void BlenderClient::sendSerializedMeshes(const std::string& serializedMeshes)
     while (pos < serializedMeshes.length())
     {
         const std::string chunk = serializedMeshes.substr(pos, chunkSize);
-        boost::asio::write(m_socket, boost::asio::buffer(chunk));
+        try
+        {
+            boost::asio::write(m_socket, boost::asio::buffer(chunk));
+        }
+        catch (const boost::system::system_error& e)
+        {
+            msg_error() << "Error while writing to the socket: " << e.what();
+        }
         pos += chunkSize;
     }
 }
