@@ -95,11 +95,17 @@ def read_json(json_data):
         process_node(data, bpy.data.collections[sofa_collection_name], iteration)
 
     except json.JSONDecodeError as e:
-        print(f"[SOFABlender] Error decoding JSON: {e} {json_data}")
+        print(f"[SOFABlender] Error decoding JSON: {e} {json_data[:100]}...")
+        raise e
+
+
+header_tag = "<SOFABlender>"
+footer_tag = "</SOFABlender>"
 
 
 # Function to handle incoming client connections
 def handle_client(client_socket):
+    remainder = ""
     while True:
         try:
             # Receive data from the client
@@ -107,19 +113,27 @@ def handle_client(client_socket):
             if not data:
                 break
 
-            s = data.decode()
-            all_data = s
-            if "<SOFABlender>" in s:
+            s = remainder + data.decode()
+            remainder = ""
+            if header_tag in s:
+
+                index_header = s.find(header_tag)
+                all_data = s[index_header + len(header_tag):]
 
                 while True:
                     data = client_socket.recv(4096)
                     s = data.decode()
                     all_data += s
-                    if "</SOFABlender>" in s:
 
-                        all_data = all_data.replace('<SOFABlender>', '')
-                        all_data = all_data.replace('</SOFABlender>', '')
-                        read_json(all_data)
+                    if footer_tag in s:
+                        index_footer = all_data.find(footer_tag)
+                        all_data = all_data[:index_footer]
+                        remainder = all_data[index_footer + len(footer_tag):]
+
+                        try:
+                            read_json(all_data)
+                        except json.JSONDecodeError:
+                            print("[SOFABlender] Skipping iteration", all_data[:100])
 
                         break
 
