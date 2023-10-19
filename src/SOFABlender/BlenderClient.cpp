@@ -124,11 +124,28 @@ void BlenderClient::toJson(sofa::simulation::Node* node, nlohmann::json& json)
 
         nlohmann::json faces = nlohmann::json::array();
 
-        for (const auto& data : object->getDataFields())
+        const auto& dataFields = object->getDataFields();
+        std::string positionLabel = "position";
+
+        bool hasDataPosition = std::find_if(dataFields.begin(), dataFields.end(), [](const sofa::core::BaseData* data) { return data->getName() == "position"; }) != dataFields.end();
+        bool hasDataVertices = std::find_if(dataFields.begin(), dataFields.end(), [](const sofa::core::BaseData* data) { return data->getName() == "vertices"; }) != dataFields.end();
+        if (hasDataVertices && hasDataPosition)
+        {
+            const auto it = std::find_if(dataFields.begin(), dataFields.end(), [](const sofa::core::BaseData* data) { return data->getName() == "vertices"; });
+            sofa::core::BaseData* data = *it;
+            const auto typeInfo = data->getValueTypeInfo();
+            const sofa::Size nbElements = typeInfo->size(data->getValueVoidPtr()) / typeInfo->size();
+            if (nbElements > 0)
+            {
+                positionLabel = "vertices";
+            }
+        }
+
+        for (const auto& data : dataFields)
         {
             const auto& name = data->getName();
 
-            if (name == "position")
+            if (name == positionLabel)
             {
                 const auto typeInfo = data->getValueTypeInfo();
                 if (typeInfo->Container() && !typeInfo->Text() && typeInfo->Scalar())
