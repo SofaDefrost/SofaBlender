@@ -121,11 +121,12 @@ void BlenderClient::toJson(sofa::simulation::Node* node, nlohmann::json& json)
     {
         nlohmann::json jsonMesh;
         bool hasPosition = false;
+
+        nlohmann::json faces = nlohmann::json::array();
+
         for (const auto& data : object->getDataFields())
         {
             const auto& name = data->getName();
-
-            nlohmann::json faces = nlohmann::json::array();
 
             if (name == "position")
             {
@@ -172,10 +173,11 @@ void BlenderClient::toJson(sofa::simulation::Node* node, nlohmann::json& json)
                     }
                 }
             }
-            if (!faces.empty())
-            {
-                jsonMesh["faces"] = faces;
-            }
+        }
+
+        if (!faces.empty())
+        {
+            jsonMesh["faces"] = faces;
         }
 
         if (!jsonMesh.empty() && hasPosition)
