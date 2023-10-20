@@ -40,13 +40,16 @@ def process_object(object_data, collection, iteration):
                 new_object = bpy.data.objects.new(object_name, new_mesh)
                 collection.objects.link(new_object)
             else:
-                obj = collection.objects[object_name]
+                print(object_name)
+                if object_name in collection.objects:
+                    obj = collection.objects[object_name]
 
-                pos_id = 0
-                for v in object_data["position"]:
-                    obj.data.vertices[pos_id].co = v
-                    obj.data.vertices[pos_id].keyframe_insert("co", frame=iteration)
-                    pos_id = pos_id + 1
+                    obj.data.clear_geometry()
+                    obj.data.from_pydata(object_data["position"], {}, object_data["faces"])
+                    obj.data.update()
+
+                    # for v in obj.data.vertices:
+                    #     v.keyframe_insert("co", frame=iteration)
 
 
 def process_node(node_data, collection, iteration):
@@ -83,16 +86,19 @@ def read_json(json_data):
     try:
         data = json.loads(json_data)
         iteration = data["iteration"]
+        print("iteration #", iteration)
 
         bpy.context.scene.frame_start = 0
         bpy.context.scene.frame_end = iteration
 
-        if bpy.data.collections.find(sofa_collection_name) == -1:
+        c = sofa_collection_name
+
+        if bpy.data.collections.find(c) == -1:
             print('[SOFABlender] Creating SOFA Collection')
-            new_sofa_collection = bpy.data.collections.new(sofa_collection_name)
+            new_sofa_collection = bpy.data.collections.new(c)
             bpy.context.scene.collection.children.link(new_sofa_collection)
 
-        process_node(data, bpy.data.collections[sofa_collection_name], iteration)
+        process_node(data, bpy.data.collections[c], iteration)
 
     except json.JSONDecodeError as e:
         print(f"[SOFABlender] Error decoding JSON: {e} {json_data[:100]}...")
