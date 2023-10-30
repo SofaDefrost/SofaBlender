@@ -11,7 +11,11 @@ from bpy.props import BoolProperty, StringProperty, IntProperty
 from bpy.types import AddonPreferences, Operator
 
 from . import (
-    server 
+    handlers,
+    operators,
+    panels,
+    properties,
+    server,
 )
 
 class Start(Operator):
@@ -86,12 +90,22 @@ def register():
     bpy.utils.register_class(SOFABlenderSettings)
     bpy.utils.register_class(Start)
     bpy.utils.register_class(Stop)
+    operators.register()
+    panels.register()
+    properties.register()
+    handlers.register()
+
 
 def unregister():
     shutdown()
     bpy.utils.unregister_class(SOFABlenderSettings)
     bpy.utils.unregister_class(Start)
     bpy.utils.unregister_class(Stop)
+    operators.unregister()
+    panels.unregister()
+    properties.unregister()
+    handlers.register()
 
 if __name__ == "__main__":
     register()
+
