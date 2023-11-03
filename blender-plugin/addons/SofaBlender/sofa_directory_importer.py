@@ -224,7 +224,7 @@ def load_baked_object_at_frame(frame, mesh, basedir):
             mesh.data.attributes.new(name="qw", type='FLOAT', domain='POINT')
             
             for i in range(4):
-                cname = ["qx, qy, qz, qw"][i]
+                cname = ["qx", "qy", "qz", "qw"][i]
                 attribute = mesh.data.attributes[cname].data
                 for j in range(len(attribute)):
                     t = attribute[j]
