@@ -96,12 +96,13 @@ def save_sofa_state(frame, object_rule, basedir):
         with open(fullpathname, "wb") as f:
             f.write(json.dumps(tmp, option=json.OPT_SERIALIZE_NUMPY))
 
-def get_all_objects(selection_rule, node, out = []):
+def get_all_objects(selection_rule, node, out):
     typename, pathname, datafields = selection_rule
     for object in node.objects:
         if object.getClassName() == typename:
             if pathname == "*" or object.getPathName() == pathname:
-                out.append((object, datafields))
+                if object.getPathName() not in out:
+                    out[object.getPathName()] = (object, datafields)
     for child in node.children:
         get_all_objects(selection_rule, child, out)
     return out
@@ -202,6 +203,8 @@ def createScene(root):
     parser.add_argument("selection", None, "The filtering used to dump that scene, use this to select the object/field to export")
     parser.parse(sys.argv[1:])
 
+    print("TEST EXPORTER... ", sys.argv)
+
     sourcefile =  parser["filename"]
     fps = float(parser["fps"])
     timing = parser["timing"]
@@ -229,16 +232,16 @@ def createScene(root):
     else: 
         selection_rules = json.loads(open(selection_file, "rt").read())
 
-    objects = []
+    objects = {}
     for rule in selection_rules:
         objects = get_all_objects(rule.values(), root, objects)
 
     print("Exporting ")
-    for object_sel in objects:
+    for key, object_sel in objects.items():
         object, datafields = object_sel
         print("  object ", object.getPathName())
 
-    root.addObject(BlenderExporter(name="BlenderExporter", root=root, objects=objects, 
+    root.addObject(BlenderExporter(name="BlenderExporter", root=root, objects=objects.values(), 
                                                            fps=fps, timing=parser["timing"], 
                                                            base_dir=parser["basedir"])) 
 
