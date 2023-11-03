@@ -144,28 +144,117 @@ def load_baked_object_at_frame(frame, mesh, basedir):
     with open(fullpathname, "rb") as f:
         data = json.loads(f.read())    
         mesh.data.clear_geometry()
-            
-        if len(data["position"][0]) != 3:
-            data["position"] = [[a[0],a[1],a[2]] for a in data["position"] ]
 
-        if "edges" in data:
-            mesh.data.from_pydata(data["position"], data["edges"], data["triangles"]+data["quads"])
-            mesh.data.validate()
-            mesh.data.update(calc_edges=True)
-        else:
-            mesh.data.from_pydata(data["position"], [], [])
-            mesh.data.validate()
-            for name in data:
-                if name != "position" and name != "frame":
-                    if not mesh.data.attributes.get(name):
-                        mesh.data.attributes.new(name=name, type='FLOAT_VECTOR', domain='POINT')
-                        #mesh.data.attributes.new(name=’myAttributeFloat’, type=’FLOAT’, domain=’POINT’)
-        
-                    sofa_data = data[name]
-                    attribute = mesh.data.attributes[name].data
-                    for i in range(len(attribute)):
-                        t = attribute[i]
-                        t.vector.xyz = sofa_data[i]
+        position = []
+        orientation = None 
+        extra_vertex_data = []
+        topology = {
+            "edges" : [],
+            "triangles" : [],
+            "quads" : []
+        }
+
+        for name, values in data.items():
+            if name == "frame": 
+                continue 
+            elif name == "position" and len(values) > 0:
+                if len(values[0]) == 1:
+                    position = [[a[0], 0, 0] for a in values]
+                elif len(values[0]) == 2:
+                    position = [[a[0], a[1], 0] for a in values]
+                elif len(values[0]) == 3:
+                    position = [[a[0], a[1], a[2]] for a in values]
+                elif len(values[0]) == 7:
+                    position = [[a[0],a[1],a[2]] for a in values]
+                    orientation = [[a[3],a[4],a[5],a[6]] for a in values] 
+            elif name == "edges":
+                topology["edges"] = values
+            elif name == "triangles":
+                topology["triangles"] = values
+            elif name == "quads":
+                topology["quads"] = values
+            else: 
+                # https://docs.blender.org/api/current/bpy_types_enum_items/attribute_type_items.html#rna-enum-attribute-type-items
+                if isinstance(values[0], list): 
+                    if len(values[0]) == 2:
+                        extra_vertex_data.append({"name" : name,
+                                                  "type" : "FLOAT2",
+                                                  "domain" : "POINT",
+                                                  "data" : values
+                                                  })
+                    elif len(values[0]) == 3:
+                        extra_vertex_data.append({"name" : name,
+                                                  "type" : "FLOAT_VECTOR",
+                                                  "domain" : "POINT",
+                                                  "data" : values
+                                                  })
+                    elif len(values[0]) == 4:
+                        extra_vertex_data.append({"name" : name,
+                                                  "type" : "FLOAT_COLOR",
+                                                  "domain" : "POINT",
+                                                  "data" : values
+                                                  })    
+                    else:
+                        print("Unsupported type structure. Please report: ", name, values[0])
+                else:
+                    extra_vertex_data.append({"name" : name,
+                                              "type" : "FLOAT",
+                                              "domain" : "POINT",
+                                              "data" : values
+                                              })
+
+        if len(position) == 0:
+            max_idx = -1
+            for t in ["edges","triangles","quads"]:
+                for indices in topology[t]:            
+                    for index in indices:
+                        if index > max_idx:
+                            max_idx = index              
+            if max_idx >= 0:
+                position = [[0,0,0]]*(max_idx+1)
+
+        mesh.data.from_pydata(position, topology["edges"], topology["triangles"]+topology["quads"])
+        mesh.data.validate()
+        mesh.data.update(calc_edges=True)
+
+        if orientation:
+            mesh.data.attributes.new(name="qx", type='FLOAT', domain='POINT')
+            mesh.data.attributes.new(name="qy", type='FLOAT', domain='POINT')
+            mesh.data.attributes.new(name="qz", type='FLOAT', domain='POINT')
+            mesh.data.attributes.new(name="qw", type='FLOAT', domain='POINT')
+            
+            for i in range(4):
+                cname = ["qx, qy, qz, qw"][i]
+                attribute = mesh.data.attributes[cname].data
+                for j in range(len(attribute)):
+                    t = attribute[j]
+                    t.value =  orientation[j][i]
+
+        for field in extra_vertex_data:
+            mesh.data.attributes.new(name=field["name"], type=field["type"], domain=field["domain"])
+
+            num_vertices = len(mesh.data.vertices)            
+            if num_vertices == 0:
+                mesh.data.from_pydata([[0,0,0]]*len(field["data"]), [], [])
+                mesh.data.validate()
+                mesh.data.update()
+                num_vertices = len(field["data"])
+
+            sofa_data = field["data"]
+            attribute = mesh.data.attributes[field["name"]].data
+            for i in range(num_vertices):
+                t = attribute[i]
+
+                if field["type"] == "FLOAT_COLOR":      
+                    t.color.foreach_set(sofa_data[i])
+                elif field["type"] == "FLOAT_VECTOR":      
+                    t.vector.xyz = sofa_data[i]
+                #elif field["type"] == "FLOAT2":
+                #    t.value.xy = sofa_data[i]
+                elif field["type"] == "FLOAT":
+                    t.value = sofa_data[i]
+                else:
+                    print("INVALID DATA TYPE", sofa_data[i])
         
 def load_baked_objects_at_frame(frame, blender_root, cache, basedir):
     for object in cache.values():
