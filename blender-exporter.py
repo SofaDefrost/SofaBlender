@@ -66,7 +66,7 @@ def save_sofa_state(frame, object_rule, basedir):
         quads = []
     
         if "vertices" in object.__data__ and len(object.vertices) != 0:
-            vertices = object.vertices.value 
+            vertices = object.vertices.value
 
         if "edges" in object.__data__:
             edges = object.edges.value
@@ -86,6 +86,7 @@ def save_sofa_state(frame, object_rule, basedir):
                         }, option=json.OPT_SERIALIZE_NUMPY))    
     else:
         tmp = {"frame" : frame}
+        datafields = datafields.replace(" ","")
         for datafield in datafields.split(','):
             if datafield in object.__data__:
                 tmp[datafield] = object.getData(datafield).value
