@@ -1,0 +1,125 @@
+[   {
+    "classname" : "MechanicalObject",
+    "category" : "Mechanics",
+    "default_name" : "state", 
+    "inputs"   : [["object", "src"],["string","position"]],
+    "outputs"  : [["template", "type"]]
+    },{
+    "classname" : "MeshObjLoader",
+    "category" : "Loader",
+    "default_name" : "loader", 
+    "inputs"   : [["string", "filename"]],
+    "outputs"  : [["data", "position"],["data", "edges"], ["data", "triangles"]]
+    },{
+    "classname" : "UniformMass",
+    "category" : "Mechanics",
+    "default_name" : "mass", 
+    "inputs"   : [["object", "mstate"],["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "StiffSpringForceField",
+    "category" : "Mechanics",
+    "default_name" : "forcefield", 
+    "inputs"   : [["object", "mstate"],["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "IdentityMapping",
+    "category" : "Mapping",
+    "default_name" : "mapping", 
+    "inputs"   : [["object", "input"], ["object", "output"]],
+    "outputs"  : []
+    },{
+    "classname" : "OglModel",
+    "category" : "Visual",
+    "default_name" : "rendering", 
+    "inputs"   : [["object", "src"],["string","filename"],["string","texturename"]],
+    "outputs"  : []
+    },{
+    "classname" : "Prefab",
+    "category" : "Node",
+    "default_name" : "prefab", 
+    "inputs"   : [[]],
+    "outputs"  : [[]]   
+    },{
+    "classname" : "BlenderObject",
+    "category" : "Geometry ",
+    "default_name" : "geom", 
+    "inputs"   : [["string", "blender object"]],
+    "outputs"  : [["blender_data", "filename"],
+                  ["vector", "location"],
+                  ["vector", "orientation"],
+                  ["vector", "scale"]]
+    },{
+    "classname" : "BlenderController",
+    "category" : "Controller ",
+    "default_name" : "controller", 
+    "inputs"   : [],
+    "outputs"  : []
+    },{
+    "classname" : "Prefab Input",
+    "category" : "Prefab",
+    "default_name" : "self", 
+    "inputs"   : [],
+    "outputs"  : []
+    },{
+    "classname" : "Prefab Output",
+    "category" : "Prefab",
+    "default_name" : "self", 
+    "inputs"   : [],
+    "outputs"  : []
+    },{
+    "classname" : "Matrix",
+    "category" : "Math",
+    "default_name" : "self", 
+    "inputs"   : [["vector", "translation"],
+                  ["vector", "rotation"],
+                  ["vector", "scale"]
+    ],
+    "outputs"  : [["object", "transform"]
+    ]
+    },{
+    "classname" : "Transform",
+    "category" : "Math",
+    "default_name" : "self", 
+    "inputs"   : [["object", "transform A"],
+                  ["object", "transform B"]
+    ],
+    "outputs"  : [["object", "transform"]
+    ]
+    },{
+    "classname" : "MatrixToTRS",
+    "category" : "Math",
+    "default_name" : "matrixtrs1", 
+    "inputs"   : [["object", "transform"]],
+    "outputs"  : [["vector", "location"],
+                  ["vector", "rotation"],
+                  ["vector", "scale"]]
+    },{
+    "classname" : "TransformEngine",
+    "category" : "Transform",
+    "default_name" : "engine", 
+    "inputs"   : [["string","input_position"], 
+                  ["string", "translation"], 
+                  ["vector", "rotation"],
+                  ["vector", "scale"]],
+    "outputs"  : [["string", "output_position"]] 
+    },{
+    "classname" : "EulerImplicitSolver",
+    "category" : "Simulation",
+    "default_name" : "timeintegration", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "SparseLDLSolver",
+    "category" : "Simulation",
+    "default_name" : "numericalsolver", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "CGLinearSolver",
+    "category" : "Simulation",
+    "default_name" : "numericalsolver", 
+    "inputs"   : [],
+    "outputs"  : []  
+    }
+]
