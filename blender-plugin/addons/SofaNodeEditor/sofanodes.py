@@ -13,22 +13,6 @@ class SofaSimulationTree(NodeTree):
 
     filename : bpy.props.StringProperty(name="filename", default="")
 
- 
-class SofaNodeGroup(bpy.types.NodeTree): 
-    '''My custom node group''' 
-    bl_label = 'Sofa node group' 
-    bl_icon = 'NODETREE' 
-
-    def init(self): 
-        pass
- 
-    def update(self): 
-        pass
-
-    def draw_button(self):
-        for inputs in self.inputs:
-            print("COUCOUT")    
-
 class SofaSelfSocket(NodeSocket):
     # Description string
     '''Sofa self socket type'''
@@ -462,7 +446,6 @@ def generate_all_nodes():
 
 def register():
     bpy.utils.register_class(SofaSimulationTree)
-    bpy.utils.register_class(SofaNodeGroup)
     bpy.utils.register_class(SofaTemplateSocket)
     bpy.utils.register_class(SofaSelfSocket)
     bpy.utils.register_class(SofaObjectSocket)
@@ -473,7 +456,6 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(SofaSimulationTree)
-    bpy.utils.unregister_class(SofaNodeGroup)
     bpy.utils.unregister_class(SofaTemplateSocket)
     bpy.utils.unregister_class(SofaSelfSocket)
     bpy.utils.unregister_class(SofaObjectSocket)
