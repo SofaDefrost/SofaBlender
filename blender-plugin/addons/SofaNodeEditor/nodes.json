@@ -5,10 +5,10 @@
     "inputs"   : [["object", "src"],["string","position"]],
     "outputs"  : [["template", "type"]]
     },{
-    "classname" : "MeshObjLoader",
+    "classname" : "MeshOBJLoader",
     "category" : "Loader",
     "default_name" : "loader", 
-    "inputs"   : [["string", "filename"]],
+    "inputs"   : [["filepath", "filename"]],
     "outputs"  : [["data", "position"],["data", "edges"], ["data", "triangles"]]
     },{
     "classname" : "UniformMass",
@@ -32,7 +32,7 @@
     "classname" : "OglModel",
     "category" : "Visual",
     "default_name" : "rendering", 
-    "inputs"   : [["object", "src"],["string","filename"],["string","texturename"]],
+    "inputs"   : [["object", "src"],["filepath","filename"],["string","texturename"]],
     "outputs"  : []
     },{
     "classname" : "Prefab",
@@ -44,7 +44,7 @@
     "classname" : "BlenderObject",
     "category" : "Geometry ",
     "default_name" : "geom", 
-    "inputs"   : [["string", "blender object"]],
+    "inputs"   : [["blender_object", "blender object"]],
     "outputs"  : [["blender_data", "filename"],
                   ["vector", "location"],
                   ["vector", "orientation"],
