@@ -2,14 +2,26 @@
     "classname" : "MechanicalObject",
     "category" : "Mechanics",
     "default_name" : "state", 
-    "inputs"   : [["object", "src"],["string","position"]],
+    "inputs"   : [["object", "src"]],
     "outputs"  : [["template", "type"]]
+    },{
+    "classname" : "MeshVTKLoader",
+    "category" : "Loader",
+    "default_name" : "loader", 
+    "inputs"   : [["filepath", "filename"]],
+    "outputs"  : []
     },{
     "classname" : "MeshOBJLoader",
     "category" : "Loader",
     "default_name" : "loader", 
     "inputs"   : [["filepath", "filename"]],
     "outputs"  : [["data", "position"],["data", "edges"], ["data", "triangles"]]
+    },{
+    "classname" : "MeshMatrixMass",
+    "category" : "Mechanics",
+    "default_name" : "mass", 
+    "inputs"   : [["object", "mstate"],["object", "src"]],
+    "outputs"  : []
     },{
     "classname" : "UniformMass",
     "category" : "Mechanics",
@@ -23,6 +35,36 @@
     "inputs"   : [["object", "mstate"],["object", "src"]],
     "outputs"  : []
     },{
+    "classname" : "RegularGridTopology",
+    "category" : "Topology",
+    "default_name" : "modifier", 
+    "inputs"   : [["object", "src"], ["string","n"],["string","min"],["string","max"]],
+    "outputs"  : []
+    },{
+    "classname" : "Hexa2TetraTopologicalMapping",
+    "category" : "Topology",
+    "default_name" : "convert", 
+    "inputs"   : [["object", "src"], ["object","input"],["object","output"], ["bool","swapping"]],
+    "outputs"  : []
+    },{
+    "classname" : "TetrahedronSetTopologyModifier",
+    "category" : "Topology",
+    "default_name" : "modifier", 
+    "inputs"   : [["object", "mstate"], ["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "TetrahedronSetTopologyContainer",
+    "category" : "Topology",
+    "default_name" : "topology", 
+    "inputs"   : [["object", "mstate"], ["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "TetrahedronFEMForceField",
+    "category" : "Mechanics",
+    "default_name" : "forcefield", 
+    "inputs"   : [["object", "mstate"], ["object", "src"], ["float", "youngModulus"], ["float", "poissonRatio"]],
+    "outputs"  : []
+    },{
     "classname" : "IdentityMapping",
     "category" : "Mapping",
     "default_name" : "mapping", 
@@ -32,20 +74,14 @@
     "classname" : "OglModel",
     "category" : "Visual",
     "default_name" : "rendering", 
-    "inputs"   : [["object", "src"],["filepath","filename"],["string","texturename"]],
+    "inputs"   : [["object", "src"],["filepath","filename"]],
     "outputs"  : []
-    },{
-    "classname" : "Prefab",
-    "category" : "Node",
-    "default_name" : "prefab", 
-    "inputs"   : [[]],
-    "outputs"  : [[]]   
     },{
     "classname" : "BlenderObject",
     "category" : "Geometry ",
     "default_name" : "geom", 
     "inputs"   : [["blender_object", "blender object"]],
-    "outputs"  : [["blender_data", "filename"],
+    "outputs"  : [["filepath", "filename"],
                   ["vector", "location"],
                   ["vector", "orientation"],
                   ["vector", "scale"]]
@@ -53,18 +89,6 @@
     "classname" : "BlenderController",
     "category" : "Controller ",
     "default_name" : "controller", 
-    "inputs"   : [],
-    "outputs"  : []
-    },{
-    "classname" : "Prefab Input",
-    "category" : "Prefab",
-    "default_name" : "self", 
-    "inputs"   : [],
-    "outputs"  : []
-    },{
-    "classname" : "Prefab Output",
-    "category" : "Prefab",
-    "default_name" : "self", 
     "inputs"   : [],
     "outputs"  : []
     },{
@@ -119,6 +143,31 @@
     "classname" : "CGLinearSolver",
     "category" : "Simulation",
     "default_name" : "numericalsolver", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "File writer",
+    "category" : "Experimental",
+    "default_name" : "Value", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "Pandas processor",
+    "category" : "Experimental",
+    "default_name" : "Value", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "ConstantValue",
+    "category" : "Value",
+    "default_name" : "values", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },
+    {
+    "classname" : "Time varing values",
+    "category" : "Experimental",
+    "default_name" : "time_values", 
     "inputs"   : [],
     "outputs"  : []  
     }

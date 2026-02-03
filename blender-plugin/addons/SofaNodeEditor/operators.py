@@ -2,6 +2,99 @@ import bpy
 import graphlib
 import subprocess
 
+def initialize_node2data(filename):
+    print("Loading SOFA field database")
+    import json
+    nodes_description = json.load(open(filename,"r"))
+    
+    result = {}
+    data_infos = {}
+    for object  in nodes_description:
+        classname = object["className"]
+        result[classname] = []
+
+        selected_set = set() 
+        for template, creator in object["creator"].items():    
+            for data in creator["object"]["data"]:
+                if data["name"] not in selected_set:
+                    selected_set.add(data["name"]) 
+                    result[classname].append(
+                        (data["name"], data["name"], f"({data['help']})")
+                    )
+                    uid = classname + "." + data["name"]
+                    data_infos[uid ] = {
+                        "name" : data["name"],
+                        "help" : data["help"],
+                        "type" : data["type"],
+                        "group" : data["group"],
+                        "default_value" : data["defaultValue"]
+                    } 
+                    #print(f"Registering data: {uid}")
+    return result, data_infos 
+
+node2data, sofa_data_infos = initialize_node2data(".sofa_blender/component_descriptions.json")
+
+SOCKET_TYPES = [
+    ('NodeSocketFloat',   "Float",   ""),
+    ('NodeSocketInt',     "Int",     ""),
+    ('NodeSocketBool',    "Boolean", ""),
+    ('NodeSocketVector',  "Vector",  ""),
+    ('NodeSocketColor',   "Color",   ""),
+    ('NodeSocketString',  "String",  ""),
+]
+
+def get_sofa_datatype(class_name, data_name):
+    global sofa_data_infos 
+    uid = class_name + "." + data_name
+
+    if uid not in sofa_data_infos:
+        print(f"WARNING: Unable to find real type for '{uid}' falling back to type 'string'")
+        return "string"  
+    
+    return sofa_data_infos[uid]["type"]
+
+def node_generate_new_socket_name(node, name, is_input):
+    target = node.inputs if is_input else node.outputs    
+    i = 0 
+    newname = name
+    while newname in target:
+        i+=1
+        newname = f"{name}{i}"
+    return newname
+
+def datatype_to_sockettype(sofa_data_type):
+    types = {
+        "float" : "NodeSocketFloat",
+        "string" : "NodeSocketString",
+        "bool" : "NodeSocketBool",
+        "I" : "NodeSocketInt",
+        "Vec3" : "NodeSocketVector",
+    }
+    if sofa_data_type in types:
+        return types[sofa_data_type]
+    
+    if "vector<" in sofa_data_type:
+        return "MyCollectionSocket"
+
+    return "NodeSocketString"
+
+def socket_name_exists(name, sockets):
+    return any(s.name == name for s in sockets)
+
+def node_create_socket(name, is_input, type, node):
+    if is_input:
+        target = node.inputs
+    else: 
+        target = node.outputs
+
+    if socket_name_exists(name, target): 
+        return False
+    
+    target.new(type=type, name=name)
+    target.move(len(target)-1, len(target)-2)
+    return True 
+
+
 def get_full_parent_path(node):
     if node.parent:
         return f"{get_full_parent_path(node.parent)}/{node.name}"
@@ -60,6 +153,7 @@ def build_dag(self, node_tree, node):
                 already_imported[controller_name] = True
                 
         f.write("import Sofa\n")
+        f.write("from SofaBlender import ConstantValue\n")    
         f.write(imports)
         f.write("\n")
 
@@ -113,17 +207,19 @@ def build_dag(self, node_tree, node):
                 bpy.data.objects[blender_name].select_set(True)
                 
                 filename = blender_name+".obj"
-                bpy.ops.wm.obj_export(filepath=filename, export_selected_objects=True)
+                bpy.ops.wm.obj_export(filepath=filename, 
+                                      export_selected_objects=True,  
+                                      export_uv=True, export_materials=True, path_mode='COPY')
                 
                 for o in current_node.outputs:
                     print("NODE OUTPUTE ", o) 
                 
-                current_node.outputs["filename"].value = filename
+                current_node.outputs["filename"].default_value = filename
                 current_node.outputs["location"].default_value = blender_object.location
                 current_node.outputs["orientation"].default_value = blender_object.rotation_euler
                 current_node.outputs["scale"].default_value = blender_object.scale                
                 
-                print("        save special blender object values is ", current_node.outputs["filename"].value)
+                print("        save special blender object values is ", current_node.outputs["filename"].default_value)
                 continue
 
             parent = "self"
@@ -156,10 +252,13 @@ def build_dag(self, node_tree, node):
                     for link in input.links:
                         print(f"Connecting: {input.name} -> {link.from_node.name} X {link.from_socket.name}")
                         if link.from_socket.bl_idname != "SofaBlenderSocket":
-                            if link.from_socket.bl_idname == "SofaSelfSocket":
+                            if link.from_socket.node.bl_idname == "BlenderObject":
+                                if link.from_socket.bl_idname == "SofaSelfSocket":
+                                    args += ", {}={}".format(input.name, repr(link.from_node.outputs[link.to_socket.name].default_value))                                                    
+                                else:
+                                    args += ", {}={}".format(input.name, repr(link.from_socket.default_value))                                                    
+                            elif link.from_socket.bl_idname == "SofaSelfSocket":
                                 args += ", " + input.name + "=" + node2path[link.from_node] + ".linkpath"
-                            elif link.from_socket.node.bl_idname == "BlenderObject":
-                                args += ", {}={}".format(input.name, repr(list(link.from_socket.default_value)))                                                    
                             else:
                                 source_name = str(link.from_node.name)
                                 if link.from_node.bl_idname == "NodeGroupInput":
@@ -178,9 +277,12 @@ def build_dag(self, node_tree, node):
                     if hasattr(input, "default_value"):
                         if input.default_value != "":
                             args += ", " + input.name + "=" + repr(input.default_value) 
-                            
- 
-
+            
+            if current_node.bl_idname == "ConstantValue":
+                for socket in current_node.outputs:
+                    if socket.name not in ["","self"]:
+                        args += ", " + socket.name + "=" + repr(current_node[socket.name]) 
+                    
             if current_node.bl_idname == "BlenderController":
                 name = self.get_controller_name(controller_instance.type) 
                 name1 = name+"1"
@@ -192,6 +294,13 @@ def build_dag(self, node_tree, node):
                     args))                            
             # Faites ici ce que vous voulez avec le nœud
             # Par exemple, imprimer son nom :
+            elif current_node.bl_idname == "ConstantValue":
+                f.write("    {} = {}.addObject({}(name='{}' {}))\n".format(
+                    local_name,
+                    parent, 
+                    "ConstantValue",
+                    current_node.name,
+                    args))                            
             elif current_node.bl_idname == "Prefab":
                 f.write("    {} = {}.addChild({}(name='{}' {}))\n".format(
                     local_name,
@@ -237,8 +346,14 @@ class MESH_OT_sofa_prefab_export(bpy.types.Operator):
         return name
     
     def build_dag(self, node_tree, node):
-        return build_dag(self, node_tree, node)
-    
+        try:
+            return build_dag(self, node_tree, node)
+        except Exception as e:
+            def draw_error(self, context):
+                self.layout.label(text=f"Error: {str(e)}")
+            bpy.context.window_manager.popup_menu(draw_error, title="Erreur", icon='ERROR')
+            raise e
+
     def export_controller_to(self, name):
         """Export a controller from the Blender text panel. 
            The filename is deduced from the name"""
@@ -296,16 +411,208 @@ class MESH_OT_firefox_open(MESH_OT_sofa_prefab_export):
     def execute(self, context):
         subprocess.Popen(["firefox", "-new-tab", "https://sofapython3.readthedocs.io/en/latest/content/modules/Sofa/index.html#"]) 
         return {"FINISHED"}
+
+class NODE_OT_add_dynamic_input(bpy.types.Operator):
+    bl_idname = "node.add_dynamic_input"
+    bl_label = "Open firefox on the corresponding help page"
+
+    def execute(self, context):
+        node = context.node
+        node.inputs.new("NodeSocketFloat", f"Value {len(node.inputs)}")
+        return {'FINISHED'}
+
+
+
+class NODE_OT_add_dynamic_socket(bpy.types.Operator):
+    bl_idname = "node.add_dynamic_socket"
+    bl_label = "Add Input"
+
+    node_name: bpy.props.StringProperty()
+
+    def execute(self, context):
+        tree = context.space_data.edit_tree
+        node = tree.nodes.get(self.node_name)
+
+        if not node:
+            return {'CANCELLED'}
+
+        # suppression du "+"
+        plus = node.inputs[-1]
+        node.inputs.remove(plus)
+
+        # création du vrai socket
+        node.inputs.new(
+            "NodeSocketFloat",
+            f"Value {len(node.inputs)+1}"
+        )
+
+        # recréation du "+"
+        node.inputs.new("NodeSocketAdd", "")
+
+        return {'FINISHED'}
+
+class NODE_OT_my_search_popup(bpy.types.Operator):
+    bl_idname = "node.my_search_popup"
+    bl_label = "Search Item"
+    bl_property = "value"
+
+    node_classname : bpy.props.StringProperty()
+    node_name : bpy.props.StringProperty()
+    is_input : bpy.props.BoolProperty()
+
+    def get_items(self, context):
+        creator = [("CREATE", "New socket ...", "Creates a new socket field")]
+        node_classname = self.node_classname
+        if node_classname is None:
+            return creator
         
+        return creator + node2data[node_classname] 
+    value : bpy.props.EnumProperty(name="value", items=get_items)
+    
+
+    def invoke(self, context, event):
+        context.window_manager.invoke_search_popup(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        node_tree = context.space_data.edit_tree
+        node = node_tree.nodes.get(self.node_name)
+        if not node:
+            return {"FINISHED"} 
+
+        name = node_generate_new_socket_name(node, "new_socket", self.is_input)
+
+        if self.value == "CREATE":
+            bpy.ops.node.panel_add_socket('INVOKE_DEFAULT', 
+                                          socket_name = name, 
+                                          socket_side="INPUT" if self.is_input else "OUTPUT")
+            return {'FINISHED'}
+
+        # Query a sofa data type from a pair composed of (classname,dataname)
+        sofa_data_type = get_sofa_datatype(self.node_classname, self.value)
+        node_create_socket(self.value, self.is_input, datatype_to_sockettype(sofa_data_type), node)
+        return {'FINISHED'}
+
+    def draw(self, context):
+        self.layout.prop(self, "value", text="")
+
+
+def my_socket_menu(self, context):
+    node = context.node
+    socket = context.socket
+    if not node or not socket:
+        return
+    # Ajouter une entrée
+    op = self.layout.operator("node.remove_socket", text="Remove Socket (Custom)")
+    op.node_name = node.name
+    op.socket_name = socket.name
+
+# Opérateur pour supprimer le socket
+class NODE_OT_remove_socket(bpy.types.Operator):
+    bl_idname = "node.remove_socket"
+    bl_label = "Remove Socket"
+
+    node_name: bpy.props.StringProperty()
+    socket_name: bpy.props.StringProperty()
+
+    def execute(self, context):
+        node_tree = context.space_data.edit_tree
+        node = node_tree.nodes.get(self.node_name)
+        if not node:
+            return {'CANCELLED'}
+        socket = node.inputs.get(self.socket_name) or node.outputs.get(self.socket_name)
+        if socket:
+            if socket.is_input:
+                node.inputs.remove(socket)
+            else:
+                node.outputs.remove(socket)
+        return {'FINISHED'}
+
+class NODE_OT_panel_remove_socket(bpy.types.Operator):
+    bl_idname = "node.panel_remove_socket"
+    bl_label = "Remove socket"
+    bl_options = {'UNDO'}
+
+    socket_index: bpy.props.IntProperty()
+    socket_type : bpy.props.StringProperty()
+
+    @classmethod
+    def poll(cls, context):
+        node = context.active_node
+        return node and (hasattr(node, "inputs") or hasattr(node, "outputs"))
+
+    def execute(self, context):
+        node = context.active_node
+        
+        if self.socket_type == "INPUT":
+            sockets = node.inputs
+        else:
+            sockets = node.outputs 
+
+        try:
+            socket = sockets[self.socket_index]
+        except IndexError:
+            return {'CANCELLED'}
+
+        if socket.is_linked:
+            tree = context.space_data.edit_tree
+            for link in list(socket.links):
+                tree.links.remove(link)
+
+        sockets.remove(socket)
+        return {'FINISHED'}
+
+class NODE_OT_panel_add_socket(bpy.types.Operator):
+    bl_idname = "node.panel_add_socket"
+    bl_label = "Add Socket"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    socket_name: bpy.props.StringProperty(name="Name", default="NewSocket")
+    socket_type: bpy.props.EnumProperty(name="Type", items=SOCKET_TYPES, default='NodeSocketFloat')
+    socket_side :bpy.props.EnumProperty(name="Direction", 
+                                        items=[("INPUT","Input",""),("OUTPUT","Output","")], default="INPUT") 
+
+    @classmethod
+    def poll(cls, context):
+        node = context.active_node
+        return node and hasattr(node, "inputs")
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        node = context.active_node
+
+        if self.socket_side == "INPUT":
+            target = node.inputs
+        else: 
+            target = node.outputs
+
+        if socket_name_exists(self.socket_name, target): 
+            return {'CANCELLED'}
+
+        target.new(type=self.socket_type, name=self.socket_name)
+        target.move(len(target) - 1, len(target) - 2)
+        return {'FINISHED'}
+
+
 def register():
     bpy.utils.register_class(MESH_OT_sofa_export)
     bpy.utils.register_class(MESH_OT_sofa_prefab_export)
     bpy.utils.register_class(MESH_OT_sofa_prefab_run)
     bpy.utils.register_class(MESH_OT_firefox_open)
-
+    bpy.utils.register_class(NODE_OT_add_dynamic_input)
+    bpy.utils.register_class(NODE_OT_add_dynamic_socket)
+    bpy.utils.register_class(NODE_OT_my_search_popup)
+    bpy.utils.register_class(NODE_OT_remove_socket)
+    bpy.utils.register_class(NODE_OT_panel_remove_socket)
+    bpy.utils.register_class(NODE_OT_panel_add_socket)
+    
 def unregister():
     bpy.utils.unregister_class(MESH_OT_sofa_prefab_export)
     bpy.utils.unregister_class(MESH_OT_sofa_prefab_run)
     bpy.utils.unregister_class(MESH_OT_firefox_open)
-
+    bpy.utils.unregister_class(NODE_OT_my_search_popup)
+    bpy.utils.unregister_class(NODE_OT_panel_remove_socket)
+    bpy.utils.unregister_class(NODE_OT_panel_add_socket)
 
