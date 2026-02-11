@@ -3,7 +3,7 @@
     "category" : "Mechanics",
     "default_name" : "state", 
     "inputs"   : [["object", "src"]],
-    "outputs"  : [["template", "type"]]
+    "outputs"  : []
     },{
     "classname" : "MeshVTKLoader",
     "category" : "Loader",
@@ -15,7 +15,7 @@
     "category" : "Loader",
     "default_name" : "loader", 
     "inputs"   : [["filepath", "filename"]],
-    "outputs"  : [["data", "position"],["data", "edges"], ["data", "triangles"]]
+    "outputs"  : []
     },{
     "classname" : "MeshMatrixMass",
     "category" : "Mechanics",
@@ -74,7 +74,7 @@
     "classname" : "OglModel",
     "category" : "Visual",
     "default_name" : "rendering", 
-    "inputs"   : [["object", "src"],["filepath","filename"]],
+    "inputs"   : [["object", "src"]],
     "outputs"  : []
     },{
     "classname" : "BlenderObject",
@@ -143,7 +143,7 @@
     "classname" : "CGLinearSolver",
     "category" : "Simulation",
     "default_name" : "numericalsolver", 
-    "inputs"   : [],
+    "inputs"   : [["float","tolerance"],["float", "threshold"],["int", "iterations"]],
     "outputs"  : []  
     },{
     "classname" : "File writer",

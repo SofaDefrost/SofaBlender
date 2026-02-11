@@ -1,5 +1,6 @@
 import bpy
-from bpy.types import NodeTree, Node, NodeSocket
+from bpy.types import NodeTree, Node, NodeSocket, NodeSocketObject
+from . import sofainfos
 
 socket_from_type = {
                 "template" : "SofaTemplateSocket",
@@ -9,7 +10,8 @@ socket_from_type = {
                 "blender_data" : "SofaBlenderSocket",
                 "vector" : "NodeSocketVector",
                 "float" : "NodeSocketFloat",
-                "blender_object" : "NodeSocketObject",
+                "int" : "NodeSocketInt",
+                "blender_object" : "BlenderObjectSocket",
                 "filepath" : "NodeSocketStringFilePath"
             }
 
@@ -69,14 +71,57 @@ class SofaBlenderSocket(NodeSocket):
     bl_label = "Blender data"
 
     value : bpy.props.StringProperty(default="COUCOU") 
+    is_valid = False
+
+    def init(self):
+        self.is_valid = True
 
     # Optional function for drawing the socket input value
     def draw(self, context, layout, node, text):
         layout.label(text=text)
-   
+
     # Socket color
     def draw_color(self, context, node):
-        return (1.0, 0.0, 0.9, 0.5)
+        print("DRAW S")
+        if self.is_valid:
+            return (1.0, 0.0, 0.9, 0.5)
+        return (1.0, 0.0, 0.0, 0.5)
+
+# Custom socket type
+class BlenderObjectSocket(NodeSocketObject):
+    # Description string
+    '''Blender Object socket type'''
+
+    # Optional identifier string. If not explicitly defined, the python class name is used.
+    bl_idname = 'BlenderObjectSocket'
+    
+    # Label for nice name display
+    bl_label = "Blender object X"
+
+    def mesh_poll(self, obj):
+        return obj.type == 'MESH'
+
+    object: bpy.props.PointerProperty(name="Object", type=bpy.types.Object, poll=mesh_poll)
+
+
+    def init(self):
+        super().init()
+
+    # Optional function for drawing the socket input value
+    def draw(self, context, layout, node, text):
+        if self.object is None:
+            layout.alert = True
+            layout.prop(self, "object", text=text, icon="ERROR")
+            return 
+
+        if self.is_linked:
+            layout.label(text=text)
+        else:            
+            layout.alert = False
+            layout.prop(self, "object", text=text)
+        
+    def draw_color(self, context, node):
+        return (0.2, 0.7, 1.0, 1.0)
 
 # Custom socket type
 class SofaDataSocket(NodeSocket):
@@ -113,7 +158,7 @@ class SofaTemplateSocket(NodeSocket):
         ('Rigid3', "Rigid3", "Rigid frame")
     )
 
-    my_enum_prop: bpy.props.EnumProperty(
+    value: bpy.props.EnumProperty(
         name="template",
         description="Just an example",
         items=my_items,
@@ -125,7 +170,7 @@ class SofaTemplateSocket(NodeSocket):
         if not self.is_output and self.is_linked:
             layout.label(text=text)
         else:
-            layout.prop(self, "my_enum_prop", text=text)
+            layout.prop(self, "value", text=text)
 
     # Socket color
     def draw_color(self, context, node):
@@ -145,10 +190,11 @@ class MyCollectionSocket(bpy.types.NodeSocket):
 
     def draw(self, context, layout, node, text):
         # Affiche juste un label et le nombre d'items
-        split = layout.split(factor=0.2)
-        split.label(icon='MESH_CUBE')  # icône à droite
-        split.label(text=text)
-        
+        #split = layout.split(factor=0.2)
+        #split.label(icon='MESH_CUBE')  # icône à droite
+        #split.label(text=text)
+        layout.label(text=text)
+
     def draw_color(self, context, node):
         return (0.2, 0.6, 1.0, 1.0)
 
@@ -165,7 +211,8 @@ class NodeSocketAny(bpy.types.NodeSocket):
                 icon='PLUS',
                 emboss=False
         )
-        op.node_classname = self.node.bl_idname
+
+        op.node_classname = self.node.type if self.node.bl_idname == "CustomObject" else self.node.bl_idname
         op.node_name = self.node.name
         op.is_input = self.is_input
 
@@ -221,6 +268,7 @@ class PrefabGroupNode(MyCustomTreeNode, Node):
 # For more examples see release/scripts/startup/nodeitems_builtins.py
 import nodeitems_utils
 from nodeitems_utils import NodeCategory, NodeItem
+from . import sofaerrors
 
 class MyNodeCategory(NodeCategory):
     @classmethod
@@ -229,6 +277,7 @@ class MyNodeCategory(NodeCategory):
 
 def socket_name_exists(name, sockets):
     return any(s.name == name for s in sockets)
+
 
 def object_class_generator(node_name, default_name, inputs, outputs):
     class SofaObjectNode(MyCustomTreeNode, Node):
@@ -242,7 +291,7 @@ def object_class_generator(node_name, default_name, inputs, outputs):
         bl_label = node_name
         bl_icon = 'NODE'
 
-        selected_item: bpy.props.StringProperty(name="Selected Item")
+        #selected_item: bpy.props.StringProperty(name="Selected Item")
         
         canAddInput : bpy.props.BoolProperty(name="canAddInput")  = True
         canAddOutput : bpy.props.BoolProperty(name="canAddOutput") = True
@@ -256,26 +305,28 @@ def object_class_generator(node_name, default_name, inputs, outputs):
         def update(self):
             self.sync_any_socket()
 
-        def sync_any_socket(self):
+        def sync_any_input(self):
             if self.canAddInput and hasattr(self, "inputs"):
                 if len(self.inputs) == 0:
                     return 
-                last = self.inputs[-1]
 
                 # sécurité
-                if last.bl_idname != "NodeSocketAny":
+                if self.inputs[-1].bl_idname != "NodeSocketAny":
                     n = self.inputs.new("NodeSocketAny", "")
                     n.is_input = True
                     return
+
+                last = self.inputs[-1]
 
                 # 🔌 connecté → créer un vrai socket
                 if self.canAddInput and last.is_linked:
                     links = list(last.links)
                     n = links[0].from_socket.name
+                    t = links[0].from_socket.bl_idname
                     if n == "self":
                         n = "src"
-                    t = links[0].from_socket.bl_idname
-                
+                        t = "SofaObjectSocket"
+
                     # Remove the links form the current socket if there is one with similar name
                     if socket_name_exists(n, self.inputs):
                         tree = bpy.context.space_data.edit_tree
@@ -290,23 +341,25 @@ def object_class_generator(node_name, default_name, inputs, outputs):
                     n = self.inputs.new("NodeSocketAny", "")
                     n.is_input = True
 
+        def sync_any_output(self):
             if self.canAddOutput and hasattr(self, "outputs"):
                 if len(self.outputs) == 0:
                     return 
 
-                last = self.outputs[-1]
-
                 # sécurité
-                if self.canAddOutput and last.bl_idname != "NodeSocketAny":
+                if self.canAddOutput and self.outputs[-1].bl_idname != "NodeSocketAny":
                     n = self.outputs.new("NodeSocketAny", "")
                     n.is_input = False
                     return
+
+                last = self.outputs[-1]
 
                 # 🔌 connecté → créer un vrai socket
                 if self.canAddOutput and last.is_linked:
                     links = list(last.links)
                     n = links[0].to_socket.name
                     t = links[0].to_socket.bl_idname
+
                     if socket_name_exists(n, self.outputs):
                         tree = bpy.context.space_data.edit_tree
                         for link in list(links):
@@ -322,20 +375,26 @@ def object_class_generator(node_name, default_name, inputs, outputs):
                     t = self.outputs.new("NodeSocketAny", "")
                     t.is_input = False
 
+        def sync_any_socket(self):
+            self.sync_any_input()
+            self.sync_any_output()
+
         def init(self, context):
             self.name = default_name
-
-            if "Prefab" not in node_name:
+            if "Prefab" not in node_name and "BlenderObject" != node_name:
                 self.outputs.new('SofaSelfSocket', "self")
-            else:
-                self.use_custom_color = True
-                self.color = (0.5,0.5,0.5) 
                 
-            for type, name in outputs:
-                self.outputs.new(socket_from_type[type], name)
+            for type, name in outputs:                
+                s = self.outputs.new(socket_from_type[type], name)
+                default_value = sofainfos.get_default_value(node_name, name)
+                if default_value:
+                    s.default_value = default_value 
         
             for type, name in inputs:
-                self.inputs.new(socket_from_type[type], name)
+                s= self.inputs.new(socket_from_type[type], name)
+                default_value = sofainfos.get_default_value(node_name, name)
+                if default_value:
+                    s.default_value = default_value 
         
             self.canAddInput = True
             self.canAddOutput = True
@@ -352,29 +411,36 @@ def object_class_generator(node_name, default_name, inputs, outputs):
             if self.canAddOutput: 
                 n = self.outputs.new("NodeSocketAny", "")
                 n.is_input = False
-           
-        #def draw_context_menu(self, context, layout):
-        #    layout.operator(
-        #        "node.remove_socket",
-        #        text="Remove Socket"
-        #    ).socket_name = self.name
 
-        def draw_buttons(self, context, layout):
-            
+        def draw_buttons(self, context, layout): 
             # Si le socket est connecté, afficher le champ pour saisir la valeur
             for socket in self.outputs:
                 row = layout.row(align=True)
                 if socket.name in self.keys():  
                     row.prop(self, f'["{socket.name}"]', text=socket.name)
+                    
+            for socket in self.inputs:
+                row = layout.row(align=True)
+                row.alert = True            
                 
+                #if socket.name in sofaerrors.errors.get(self.name,{}) :  
+                    
         # Optional: custom label
         # Explicit user label overrides this, but here we can define a label dynamically
-        def draw_label(self):
-            return node_name 
+        def draw_label(self):  
+            if node_name != "BlenderObject":
+                return node_name       
 
-        def draw_color(self):
-            return (0.5, 0.4, 0.216, 1.0)
-      
+            selected_object = self.inputs["blender object"].object
+            if not selected_object:
+                return node_name 
+
+            vtx = len(selected_object.data.vertices)
+            polys = len(selected_object.data.polygons)
+            
+            return f"{node_name} (polys: {polys}, vtx:{vtx})"
+
+        
     return SofaObjectNode
 
 def socket_type_name(sock):
@@ -416,9 +482,7 @@ def node_class_generator(node_name, default_name, inputs, outputs):
                                         poll=lambda self, obj: obj != bpy.context.space_data.node_tree)
         
         def init(self, context):
-            #self.inputs.new('SofaTemplateSocket', "template")
             self.outputs.new('SofaSelfSocket', "self")
-            #self.inputs.new('SofaSelfSocket', "context")
             
             self.use_custom_color = True
             self.color = (0.1,0.1,0.1) 
@@ -590,19 +654,74 @@ def generate_all_nodes():
 
     #print("Categories -> ", node_categories.keys() )
     register_class(node_class_generator("Prefab","Prefab",[],[]))
+    
+    class CustomObject(object_class_generator("Custom","Custom",[],[])):
+         # === Basics ===
+        # Description string
+        '''A custom node'''
+
+        # Optional identifier string. If not explicitly defined, the python class name is used.
+        bl_idname = "CustomObject"
+
+        # Label for nice name display
+        bl_label = "Object"
+
+        bl_width_default = 300
+        bl_width_min = 300
+
+        type: bpy.props.StringProperty(default="", 
+                                       update=lambda self, context: self.type_changed())
+        
+        def init(self, context):      
+            self.color = (0.1,0.1,0.1) 
+            super().init(context)
+            
+        def type_changed(self):
+            if self.type == "":
+                self.name = "" 
+                return 
+
+            self.name = self.type.lower()
+
+        def draw_buttons(self, context, layout): 
+            is_empty = (self.type == "") 
+            if is_empty:
+                split = layout.split(factor=0.3) 
+                split.alert = True
+                split.label(text="type")
+                op = split.operator(
+                    "node.search_sofa_type_popup",
+                    text="Name",
+                    icon='ERROR',
+                    emboss=True)
+                op.node_name = self.name
+            else:
+                icon = "ASSET_MANAGER" if sofainfos.get_creator(self.type) else "PLUS"
+
+                row = layout.row()
+                row.prop(self, "type", icon=icon)
+      
+            layout.separator()
+            super().draw_buttons(context, layout)
+            
+        # Optional: custom label
+        # Explicit user label overrides this, but here we can define a label dynamically
+        def draw_label(self):
+            if self.type == "":   
+                return f"undefined (CustomObject)"             
+            return f"{self.type} (CustomObject)"
+
+    register_class(CustomObject)
+    node_categories["Object"]=["CustomObject"]    
     node_categories["Prefab"]=["Prefab", "NodeGroupInput", "NodeGroupOutput"]
     node_categories["Node"] = ["NodeFrame"]
 
     flat_categories = []
     for k,v in node_categories.items():
-        print("REGISTERING ", k)
         flat_categories.append( MyNodeCategory(k, k, items=[NodeItem(n) for n in v] ) )
 
-    print("UNREGISTERED")
     my_unregister_node_categories(flat_categories)
-    print("RRREGISTERED")
     nodeitems_utils.register_node_categories('SOFA_NODES', flat_categories)
-    print("UNREGISTERED 2")
 
 from bpy.app.handlers import persistent
 
@@ -617,6 +736,7 @@ def register():
     bpy.utils.register_class(SofaObjectSocket)
     bpy.utils.register_class(SofaDataSocket)
     bpy.utils.register_class(SofaBlenderSocket)
+    bpy.utils.register_class(BlenderObjectSocket)
     bpy.utils.register_class(MyCollectionItem)
     bpy.utils.register_class(MyCollectionSocket)
     
@@ -638,6 +758,7 @@ def unregister():
     bpy.utils.unregister_class(SofaObjectSocket)
     bpy.utils.unregister_class(SofaDataSocket)
     bpy.utils.unregister_class(SofaBlenderSocket)
+    bpy.utils.unregister_class(BlenderObjectSocket)
     bpy.utils.unregister_class(MyCollectionItem)
     bpy.utils.unregister_class(MyCollectionSocket)
     bpy.utils.unregister_class(NodeSocketAny)

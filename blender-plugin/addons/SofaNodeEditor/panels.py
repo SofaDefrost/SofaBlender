@@ -34,6 +34,15 @@ class SofaSimulationPanel(bpy.types.Panel):
         row.operator("sofa.export", text="Export to Sofa")
 
         box = layout.box()
+        box.label(text="Import scene")
+        row = box.row()
+        row.prop(node_tree, "filename")
+        
+        row = box.row()
+        row.operator("sofa.scene_import", text="Import XML")
+
+
+        box = layout.box()
         box.label(text="WTF (I need help)")
         row = box.row()
         row.operator("firefox.open", text="Sofa doc")

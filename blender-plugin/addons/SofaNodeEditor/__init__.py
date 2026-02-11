@@ -2,7 +2,7 @@ bl_info = {
     "name": "SOFANodeEditor",
     "description": "A plugin to design SOFA simulations in blender.",
     "author": "Damien Marchal",
-    "blender": (3, 4, 0),
+    "blender": (5, 0, 0),
     "category": "Object",
 }
 
@@ -13,7 +13,8 @@ from bpy.types import AddonPreferences, Operator
 from . import (
     panels,
     operators,
-    sofanodes
+    sofanodes,
+    sofaerrors
 )
 
 class SOFANodeEditorSettings(AddonPreferences):
