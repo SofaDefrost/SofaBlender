@@ -1,6 +1,8 @@
 import bpy
 from bpy.types import NodeTree, Node, NodeSocket, NodeSocketObject
 from . import sofainfos
+from . import  utils
+import inspect
 
 socket_from_type = {
                 "template" : "SofaTemplateSocket",
@@ -96,10 +98,10 @@ class BlenderObjectSocket(NodeSocketObject):
     bl_idname = 'BlenderObjectSocket'
     
     # Label for nice name display
-    bl_label = "Blender object X"
+    bl_label = "Blender object"
 
     def mesh_poll(self, obj):
-        return obj.type == 'MESH'
+        return obj.type == 'MESH' or obj.type == "CURVE"
 
     object: bpy.props.PointerProperty(name="Object", type=bpy.types.Object, poll=mesh_poll)
 
@@ -187,13 +189,17 @@ class MyCollectionSocket(bpy.types.NodeSocket):
 
     # Collection pour stocker les données
     items: bpy.props.CollectionProperty(type=MyCollectionItem)
+    value : bpy.props.StringProperty()
 
     def draw(self, context, layout, node, text):
         # Affiche juste un label et le nombre d'items
         #split = layout.split(factor=0.2)
         #split.label(icon='MESH_CUBE')  # icône à droite
-        #split.label(text=text)
-        layout.label(text=text)
+        if self.is_linked: 
+            layout.label(text=text)
+        else:
+            layout.prop(self,"value", text=text) 
+
 
     def draw_color(self, context, node):
         return (0.2, 0.6, 1.0, 1.0)
@@ -387,14 +393,16 @@ def object_class_generator(node_name, default_name, inputs, outputs):
             for type, name in outputs:                
                 s = self.outputs.new(socket_from_type[type], name)
                 default_value = sofainfos.get_default_value(node_name, name)
-                if default_value:
-                    s.default_value = default_value 
+                print(f"ADD OUTPUT {socket_from_type[type]}.{name} to value {default_value}"  )
+                #if default_value:
+                #    s.default_value = default_value 
         
             for type, name in inputs:
-                s= self.inputs.new(socket_from_type[type], name)
+                s = self.inputs.new(socket_from_type[type], name)
                 default_value = sofainfos.get_default_value(node_name, name)
-                if default_value:
-                    s.default_value = default_value 
+                print(f"ADD INPUT {type}.{name} to value {default_value}"  )
+                #if default_value:
+                #    s.default_value = default_value 
         
             self.canAddInput = True
             self.canAddOutput = True
@@ -435,8 +443,12 @@ def object_class_generator(node_name, default_name, inputs, outputs):
             if not selected_object:
                 return node_name 
 
-            vtx = len(selected_object.data.vertices)
-            polys = len(selected_object.data.polygons)
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            obj_eval = selected_object.evaluated_get(depsgraph)
+            mesh = obj_eval.to_mesh()
+
+            vtx = len(mesh.vertices)
+            polys = len(mesh.polygons)
             
             return f"{node_name} (polys: {polys}, vtx:{vtx})"
 
@@ -529,7 +541,7 @@ def node_class_generator(node_name, default_name, inputs, outputs):
     return SofaPrefabNode
 
 def python_class_generator(node_name, default_name, inputs, outputs):
-    class SofaPythonMethodNode(MyCustomTreeNode, Node):
+    class SofaPythonMethodNode(object_class_generator(node_name,node_name,[],[]), Node):
         # === Basics ===
         # Description string
         '''A custom node'''
@@ -543,55 +555,24 @@ def python_class_generator(node_name, default_name, inputs, outputs):
         # These work just like custom properties in ID data blocks
         # Extensive information can be found under
         # http://wiki.blender.org/index.php/Doc:2.6/Manual/Extensions/Python/Properties
-        name: bpy.props.StringProperty(default=default_name)
-        type: bpy.props.StringProperty(default="Node")
-      
+        
+        type: bpy.props.PointerProperty(type=bpy.types.Text, 
+                                        update=lambda self, context: self.type_changed())
+        
+        def type_changed(self):
+            if self.type is None:
+                return 
+            
         def init(self, context):
+            super().init(context)
             self.use_custom_color = True
             self.color = (0.1,0.1,0.1) 
-            
-        def update(self):
-            if self.type in bpy.data.node_groups:
-                ng = bpy.data.node_groups[self.type]
-                    
-        def draw_buttons_ext(self, context, layout):
-            layout.prop(self, "name")
-    
+               
         def draw_buttons(self, context, layout):
-            if self.type in bpy.data.texts:
-                text = bpy.data.texts[self.type].as_string()
-                
-                cname = self.type                
-                if cname.endswith(".py"):
-                    cname = cname[:-3]
-                
-                p = import_module_from_string("test", text)
-                a = inspect.getfullargspec(p.__dict__[cname])
-                
-                for i in range(len(a.args)):
-                    arg = a.args[i]
-                    value = a.defaults[i]
-                    if arg not in self.inputs and arg != "name":                
-                        blenderTypes = {
-                            float : "NodeSocketFloat",
-                            str : "NodeSocketString",
-                            list : "NodeSocketVector",
-                        }
-                        if type(value) in blenderTypes:
-                            s = self.inputs.new(blenderTypes[type(value)], arg)
-                        else:
-                            s = self.inputs.new("NodeSocketString", arg)
-                #for output_socket in ng.outputs:
-                #    if output_socket.name not in self.outputs:
-                #        self.outputs.new(output_socket.bl_socket_idname, output_socket.name)
-           
             layout.prop(self, "type")
-      
-        def draw_color(self):
-            return (0.1, 0.4, 0.216, 0.5)
-      
+            
         def draw_label(self):
-            return self.type + " ("+self.name+")"
+            return self.type.name + " ("+self.name+")"
 
     return SofaPythonMethodNode
 
@@ -624,6 +605,7 @@ def my_unregister_node_categories(categories):
         except:
             pass
     nodeitems_utils._node_categories.clear()
+
 
 def generate_all_nodes():
     from bpy.utils import register_class
