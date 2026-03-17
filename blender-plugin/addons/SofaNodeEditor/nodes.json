@@ -1,0 +1,174 @@
+[   {
+    "classname" : "MechanicalObject",
+    "category" : "Mechanics",
+    "default_name" : "state", 
+    "inputs"   : [["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "MeshVTKLoader",
+    "category" : "Loader",
+    "default_name" : "loader", 
+    "inputs"   : [["filepath", "filename"]],
+    "outputs"  : []
+    },{
+    "classname" : "MeshOBJLoader",
+    "category" : "Loader",
+    "default_name" : "loader", 
+    "inputs"   : [["filepath", "filename"]],
+    "outputs"  : []
+    },{
+    "classname" : "MeshMatrixMass",
+    "category" : "Mechanics",
+    "default_name" : "mass", 
+    "inputs"   : [["object", "mstate"],["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "UniformMass",
+    "category" : "Mechanics",
+    "default_name" : "mass", 
+    "inputs"   : [["object", "mstate"],["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "StiffSpringForceField",
+    "category" : "Mechanics",
+    "default_name" : "forcefield", 
+    "inputs"   : [["object", "mstate"],["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "RegularGridTopology",
+    "category" : "Topology",
+    "default_name" : "modifier", 
+    "inputs"   : [["object", "src"], ["string","n"],["string","min"],["string","max"]],
+    "outputs"  : []
+    },{
+    "classname" : "Hexa2TetraTopologicalMapping",
+    "category" : "Topology",
+    "default_name" : "convert", 
+    "inputs"   : [["object", "src"], ["object","input"],["object","output"], ["bool","swapping"]],
+    "outputs"  : []
+    },{
+    "classname" : "TetrahedronSetTopologyModifier",
+    "category" : "Topology",
+    "default_name" : "modifier", 
+    "inputs"   : [["object", "mstate"], ["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "TetrahedronSetTopologyContainer",
+    "category" : "Topology",
+    "default_name" : "topology", 
+    "inputs"   : [["object", "mstate"], ["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "TetrahedronFEMForceField",
+    "category" : "Mechanics",
+    "default_name" : "forcefield", 
+    "inputs"   : [["object", "mstate"], ["object", "src"], ["float", "youngModulus"], ["float", "poissonRatio"]],
+    "outputs"  : []
+    },{
+    "classname" : "IdentityMapping",
+    "category" : "Mapping",
+    "default_name" : "mapping", 
+    "inputs"   : [["object", "input"], ["object", "output"]],
+    "outputs"  : []
+    },{
+    "classname" : "OglModel",
+    "category" : "Visual",
+    "default_name" : "rendering", 
+    "inputs"   : [["object", "src"]],
+    "outputs"  : []
+    },{
+    "classname" : "BlenderObject",
+    "category" : "Geometry ",
+    "default_name" : "geom", 
+    "inputs"   : [["blender_object", "blender object"]],
+    "outputs"  : [["filepath", "filename"],
+                  ["vector", "location"],
+                  ["vector", "orientation"],
+                  ["vector", "scale"]]
+    },{
+    "classname" : "BlenderController",
+    "category" : "Controller ",
+    "default_name" : "controller", 
+    "inputs"   : [],
+    "outputs"  : []
+    },{
+    "classname" : "Matrix",
+    "category" : "Math",
+    "default_name" : "self", 
+    "inputs"   : [["vector", "translation"],
+                  ["vector", "rotation"],
+                  ["vector", "scale"]
+    ],
+    "outputs"  : [["object", "transform"]
+    ]
+    },{
+    "classname" : "Transform",
+    "category" : "Math",
+    "default_name" : "self", 
+    "inputs"   : [["object", "transform A"],
+                  ["object", "transform B"]
+    ],
+    "outputs"  : [["object", "transform"]
+    ]
+    },{
+    "classname" : "MatrixToTRS",
+    "category" : "Math",
+    "default_name" : "matrixtrs1", 
+    "inputs"   : [["object", "transform"]],
+    "outputs"  : [["vector", "location"],
+                  ["vector", "rotation"],
+                  ["vector", "scale"]]
+    },{
+    "classname" : "TransformEngine",
+    "category" : "Transform",
+    "default_name" : "engine", 
+    "inputs"   : [["string","input_position"], 
+                  ["string", "translation"], 
+                  ["vector", "rotation"],
+                  ["vector", "scale"]],
+    "outputs"  : [["string", "output_position"]] 
+    },{
+    "classname" : "EulerImplicitSolver",
+    "category" : "Simulation",
+    "default_name" : "timeintegration", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "SparseLDLSolver",
+    "category" : "Simulation",
+    "default_name" : "numericalsolver", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "CGLinearSolver",
+    "category" : "Simulation",
+    "default_name" : "numericalsolver", 
+    "inputs"   : [["float","tolerance"],["float", "threshold"],["int", "iterations"]],
+    "outputs"  : []  
+    },{
+    "classname" : "File writer",
+    "category" : "Experimental",
+    "default_name" : "Value", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "Pandas processor",
+    "category" : "Experimental",
+    "default_name" : "Value", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },{
+    "classname" : "ConstantValue",
+    "category" : "Value",
+    "default_name" : "values", 
+    "inputs"   : [],
+    "outputs"  : []  
+    },
+    {
+    "classname" : "Time varing values",
+    "category" : "Experimental",
+    "default_name" : "time_values", 
+    "inputs"   : [],
+    "outputs"  : []  
+    }
+]

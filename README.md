@@ -2,15 +2,32 @@
 
 A project about having co-operation between Sofa and Blender. 
 
-Once the blender plugin is activated in the blender interface. 
-User has the choice between to way to have sofa and blender to interact. 
+# Features
+- build and generate sofa simulation using a dedicated node interface
+- importing result of a Sofa simulation in blender either using Client-server's mode or Disk Baking 
 
-# Client-server's mode 
+# Node base editor for Sofa Simulation
+
+The editor allow to edit a full Sofa Scene, save it to disk. 
+- direct use of Blender's object for geometrical editting 
+- any Sofa object supported 
+- UX support for Prefab
+- UX support for Controllers
+
+The linking magics rules:
+- self to src => similar behavior as the one in Sofa  (linking any socket with similar name)
+- self to "+" => add an src socket
+- named socket to "+" => add a socket on the "+" side with similar name and type as the dragged from 
+- "+" => add socket from the list of socket associated to a component or create a complete new one
+
+
+# Importing a Sofa simulation's run in blender  
+## Client-server's mode 
 This solution transmit the data over a network connexion.
 A dedicated component must be added to the scene in charge of streaming the simulation data over the network.
 This component is implemented in c++ and compiled as a binary plugin for Sofa.  
 
-# Disk baking solution. 
+## Disk baking solution. 
 Instead to transmit data over a network connexion between Sofa and Blender it is alternatively 
 possible to bake (compute) Sofa simulation and store the simulation data on disk. 
 The current implementation is using python and thus works with the binary releases of Sofa 23.12. 

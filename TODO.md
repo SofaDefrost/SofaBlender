@@ -1,0 +1,22 @@
+Things to do:
+- [X] add "generic" component with a customizable "className" 
+- [] fix adding a template on output (shows the value... even if there is an input) 
+- [] fix problem: the group outputs are not correctly saved in the .py file  (invalid type, only string) and no internal parenting 
+- [] save generic component in a fake storage 
+- [] fix problem: the prefab used in scenes are not saved recursively when clicking on their calling point
+- [] properly handle the .sofa_blender/ configuration direction using a recursive approch
+- [] when reloading the type from a Prefab, all the existing links are removed. 
+- [] group input does not support templates... 
+- [] linking template does not work... they are not data to parent.
+- [] implmeent a PythonExpression that take its input to bind them and apply a function to that (see example in pep01). 
+- [] fix the default value of attributes that are initialized from nodes.json
+- [] implement a mechanisme to handle the RequiredPlugin for a Prefab
+- [] implement a mechanisme to get the SOFA error messages highlighting the corresponding nodes and socket. => put them in RED ? 
+- [] implement a PythonController 
+- [] SofaBlenderSocket => BlenderObject
+- [] Add a visual feedback when invalid value
+- [] BlenderObject does not report error if the blender object is missing.
+- [] the "name" as input in RequiredPlugin collides with setting of names from GUI
+- [] on RequiredPlugin, the pluginName does not have a text fiel for selection.
+- [] SofaBlender.py is missing when exporting in a new directory
+- [X] Fix the shared component type in CustomObject 
