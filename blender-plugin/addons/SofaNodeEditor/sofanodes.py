@@ -254,6 +254,7 @@ class MyCustomNode(MyCustomTreeNode, Node):
         # update node when input changes 
         self.my_output = self.my_input * 2.0 
 
+
 class PrefabGroupNode(MyCustomTreeNode, Node): 
     '''My custom node''' 
     bl_idname = 'PrefabGroupNode' 
@@ -352,7 +353,7 @@ def object_class_generator(node_name, default_name, inputs, outputs):
                 if len(self.outputs) == 0:
                     return 
 
-                # sécurité
+                # check and add the "+" socket if missing
                 if self.canAddOutput and self.outputs[-1].bl_idname != "NodeSocketAny":
                     n = self.outputs.new("NodeSocketAny", "")
                     n.is_input = False
@@ -372,9 +373,13 @@ def object_class_generator(node_name, default_name, inputs, outputs):
                             tree.links.remove(link)                    
                         return 
 
-                    new = self.outputs.new(str(t), n)
-                    self.id_data.links.new(new, links[0].to_socket)    
-                    self[n] = self.outputs[n].default_value
+                    new_socket = self.outputs.new(str(t), n)
+                    self.id_data.links.new(new_socket, links[0].to_socket)    
+                    
+                    if hasattr(new_socket, 'default_value'):
+                        self[n] = new_socket.default_value
+                    else:
+                        self[n] = None
 
                     self.outputs.remove(last)
 
@@ -387,23 +392,17 @@ def object_class_generator(node_name, default_name, inputs, outputs):
 
         def init(self, context):
             self.name = default_name
-            if "Prefab" not in node_name and "BlenderObject" != node_name:
+            if "BlenderObject" != node_name:
                 self.outputs.new('SofaSelfSocket', "self")
                 
             for type, name in outputs:                
                 s = self.outputs.new(socket_from_type[type], name)
                 default_value = sofainfos.get_default_value(node_name, name)
-                print(f"ADD OUTPUT {socket_from_type[type]}.{name} to value {default_value}"  )
-                #if default_value:
-                #    s.default_value = default_value 
-        
+                
             for type, name in inputs:
                 s = self.inputs.new(socket_from_type[type], name)
                 default_value = sofainfos.get_default_value(node_name, name)
-                print(f"ADD INPUT {type}.{name} to value {default_value}"  )
-                #if default_value:
-                #    s.default_value = default_value 
-        
+                
             self.canAddInput = True
             self.canAddOutput = True
 
@@ -430,15 +429,15 @@ def object_class_generator(node_name, default_name, inputs, outputs):
             for socket in self.inputs:
                 row = layout.row(align=True)
                 row.alert = True            
-                
-                #if socket.name in sofaerrors.errors.get(self.name,{}) :  
-                    
+                                    
         # Optional: custom label
         # Explicit user label overrides this, but here we can define a label dynamically
         def draw_label(self):  
             if node_name != "BlenderObject":
-                return node_name       
+                return f"{node_name} ({self.name})"       
 
+            # For BlenderObject nodes, display the name of the selected object 
+            # and its main properties (number of vertices and polygons for meshes, number of control points for curves)
             selected_object = self.inputs["blender object"].object
             if not selected_object:
                 return node_name 
@@ -506,6 +505,12 @@ def node_class_generator(node_name, default_name, inputs, outputs):
             if self.type.name in bpy.data.node_groups:
                 ng = bpy.data.node_groups[self.type.name]
                 
+                # Save the current inputs sockets link before clearing them
+                input_links_to_save = [(socket.name, link.from_socket) for socket in self.inputs for link in socket.links]
+                output_links_to_save = [(socket.name, link.to_socket) for socket in self.outputs for link in socket.links]
+
+                print(f"INPUT AND {input_links_to_save} output links to save {output_links_to_save}")
+
                 self.inputs.clear()
                 self.outputs.clear() 
 
@@ -514,14 +519,25 @@ def node_class_generator(node_name, default_name, inputs, outputs):
                         socket = item 
                         if socket.in_out == "INPUT":
                             if socket.name not in self.inputs:
-                                print(f"ADD: {socket.name}")
                                 self.inputs.new(socket.bl_socket_idname, socket.name)
 
                         if socket.in_out == "OUTPUT":
                             if socket.name not in self.outputs:
-                                print(f"ADD: {socket.name}")
                                 self.outputs.new(socket.bl_socket_idname, socket.name)
-                    
+
+                for link in input_links_to_save:
+                    from_socket_name, to_socket = (link)
+                    from_socket = self.inputs.get(from_socket_name)
+                    if from_socket and to_socket:
+                        self.id_data.links.new(from_socket, to_socket)
+
+                for link in output_links_to_save:
+                    from_socket_name, to_socket = (link)
+                    from_socket = self.outputs.get(from_socket_name)
+                    if from_socket and to_socket:
+                        self.id_data.links.new(from_socket, to_socket)
+
+
         def draw_buttons_ext(self, context, layout):
             layout.prop(self, "name")
     
@@ -535,8 +551,8 @@ def node_class_generator(node_name, default_name, inputs, outputs):
         # Explicit user label overrides this, but here we can define a label dynamically
         def draw_label(self):
             if self.type:   
-                return self.name+" ("+self.type.name +")"
-            return self.name +"(undefined)"
+                return self.type.name+" ("+self.name +")"
+            return f"undefined ({self.name})"
 
     return SofaPrefabNode
 
@@ -705,8 +721,8 @@ def generate_all_nodes():
     my_unregister_node_categories(flat_categories)
     nodeitems_utils.register_node_categories('SOFA_NODES', flat_categories)
 
-from bpy.app.handlers import persistent
 
+from bpy.app.handlers import persistent
 @persistent
 def auto_node_on_link(scene):
     print("AUTO_NODE_ON_LINK")

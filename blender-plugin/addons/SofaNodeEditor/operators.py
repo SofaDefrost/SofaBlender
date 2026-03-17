@@ -132,6 +132,11 @@ def build_dag(self, node_tree, pathname):
             if node.parent:
                 graph[node].add(node.parent)
 
+            # Artificial link for nodes that have been imported (not sure this is a good idea)
+            predecessor = node.get("predecessor", None)
+            if predecessor:
+                graph[node].add(predecessor)
+            
             # Artificial adding a fake edge to force left-to-right saving
             if len(graph[node]) == 0:
                 for onode in node_tree.nodes:   
@@ -179,7 +184,7 @@ def build_dag(self, node_tree, pathname):
         print(f"Saving main scene: {outfilename}")
         f = open(outfilename, "w")
         f.write("import Sofa\n")
-        f.write("from SofaBlender import ConstantValue\n")    
+        f.write("from SofaBlender import ConstantValue, addObject, SofaBlenderLiveHook\n")    
         f.write(imports)
         f.write("\n")
 
@@ -187,7 +192,10 @@ def build_dag(self, node_tree, pathname):
         for item in node_tree.interface.items_tree:
             if item.item_type == "SOCKET":
                 if item.in_out == "INPUT" and item.name:
-                    kwargs += " {}={},".format(item.name, repr(item.default_value))  
+                    if hasattr(item,"default_value"):
+                        kwargs += " {}={},".format(item.name, repr(item.default_value))  
+                    else:
+                        kwargs += " {}=None,".format(item.name)  
 
         output_delayed=[]
 
@@ -195,7 +203,12 @@ def build_dag(self, node_tree, pathname):
         f.write("    self = Sofa.Core.Node(name)\n")
 
         # Process input to generated the Data field
+        id = 0
         for current_node in sorted_list_of_nodes:
+            if hasattr(current_node,"uid"):
+                id += 1 
+                setattr(current_node,'uid',id)
+
             if current_node.bl_idname == "NodeGroupInput":
                 for output_socket in current_node.outputs:
                     type = "string"
@@ -210,7 +223,10 @@ def build_dag(self, node_tree, pathname):
                     else:
                         print(f"SOCKET TYPE UNSUPPORTED {output_socket.bl_idname}")        
                     if output_socket.bl_idname not in ["SofaObjectSocket","NodeSocketVirtual"]:                       
-                        f.write("    self.addData(name='{}', type='{}', help='', group=\"Prefab's inputs\" ,default={})\n".format(output_socket.name, type, output_socket.name))     
+                        f.write("    if not hasattr(self,'{}'):\n".format(output_socket.name))                    
+                        f.write("        self.addData(name='{}', type='{}', help='', group=\"Prefab's inputs\" ,default={})\n".format(output_socket.name, type, output_socket.name))     
+                        f.write("    else:\n")
+                        f.write("        self.{} = {}\n".format(output_socket.name, output_socket.name))
                     else:
                         print(f"NodeGroupInput::socket unsupported '{output_socket.bl_idname}'")    
             if current_node.bl_idname == "NodeGroupOutput":
@@ -250,7 +266,10 @@ def build_dag(self, node_tree, pathname):
                     continue
                     #current_node.nodes.inputs["blender object"].alert = True
 
-                bpy.ops.object.select_all(action='DESELECT')
+                #bpy.ops.object.select_all(action='DESELECT')
+                for obj in bpy.context.scene.objects:
+                    obj.select_set(False)
+                
                 bpy.data.objects[blender_name].select_set(True)
                 
                 filename = os.path.join(asset_path_name, blender_name+".obj")
@@ -261,7 +280,7 @@ def build_dag(self, node_tree, pathname):
                                       export_uv=True, export_materials=True, path_mode='COPY')
                 
                 if "filename" in current_node.outputs:
-                    current_node.outputs["filename"].default_value = filename
+                    current_node.outputs["filename"].default_value = os.path.relpath(filename, pathname)
                 if "location" in current_node.outputs:
                     current_node.outputs["location"].default_value = blender_object.location
                 if "orientation" in current_node.outputs:
@@ -329,9 +348,11 @@ def build_dag(self, node_tree, pathname):
                                 if target_name == "src" and link.from_socket.name != "self":
                                     target_name = link.from_socket.name 
 
-                                mode = ".value" if input.name == "template" else ".linkpath"
-
-                                args += ", " + target_name + "=" + source_name + "." + str(link.from_socket.name) + mode        
+                                mode = ".value" if input.name == "template" else ".linkpath"                               
+                                if source_name == "self":
+                                    args += ", " + target_name + "= (" + source_name + "." + str(link.from_socket.name) + mode + ") " + f" if {link.from_socket.name} is not None else None"
+                                else:
+                                    args += ", " + target_name + "= (" + source_name + "." + str(link.from_socket.name) + mode + ") " 
                         else:
                             print("         Dumping BlenderSocket", dir(link.from_socket))
                             args += ", {}='{}'".format(input.name, str(link.from_socket.value))                        
@@ -339,12 +360,18 @@ def build_dag(self, node_tree, pathname):
                     if hasattr(input, "default_value") and input.default_value != "":
                         print(f" - setting value: {current_node.name}.{input.name} = {input.default_value}")                        
                         args += ", " + input.name + "=" + repr(input.default_value) 
-                    elif hasattr(input, "value"):
+                    elif hasattr(input, "value") and input.value != "":
                         print(f" - setting value: {current_node.name}.{input.name} = {input.value}")                        
                         args += ", " + input.name + "=" + repr(input.value) 
                     else:
                         print(f"    Unsupported socket saving {current_node.name}.{input.name} (type = {input.bl_idname})")    
+            
             if current_node.bl_idname == "ConstantValue":
+                for socket in current_node.outputs:
+                    if socket.name not in ["","self"]:
+                        args += ", " + socket.name + "=" + repr(current_node[socket.name]) 
+
+            if current_node.bl_idname == "SofaBlenderLiveHook":
                 for socket in current_node.outputs:
                     if socket.name not in ["","self"]:
                         args += ", " + socket.name + "=" + repr(current_node[socket.name]) 
@@ -361,7 +388,7 @@ def build_dag(self, node_tree, pathname):
                     current_node.name,
                     args))                            
             elif current_node.bl_idname == "CustomObject":
-                f.write("    {} = {}.addObject('{}', name='{}' {})\n".format(
+                f.write("    {} = addObject({}, '{}', name='{}' {})\n".format(
                     local_name,
                     parent, 
                     current_node.type,
@@ -372,6 +399,13 @@ def build_dag(self, node_tree, pathname):
                     local_name,
                     parent, 
                     "ConstantValue",
+                    current_node.name,
+                    args))                            
+            elif current_node.bl_idname == "PythonController":
+                f.write("    {} = {}.addObject({}(name='{}' {}))\n".format(
+                    local_name,
+                    parent, 
+                    "SofaBlenderLiveHook",
                     current_node.name,
                     args))                            
             elif current_node.bl_idname == "Prefab":
@@ -387,7 +421,7 @@ def build_dag(self, node_tree, pathname):
                     parent, 
                     current_node.name))                
             else:
-                f.write("    {} = {}.addObject('{}', name='{}' {})\n".format(
+                f.write("    {} = addObject({}, '{}', name='{}' {})\n".format(
                     local_name,
                     parent, 
                     current_node.bl_idname,
@@ -491,16 +525,16 @@ def resolve_all_pending_link(node_tree):
                 else:
                     print(f" - link {link.name} x")
                     
-def import_node(root, parent, node_tree):
-    for element in root:
-        print("PROCESSING ITEM: ", element.tag, element.attrib)
+def import_node(xml_root, parent, node_tree):
+    node = None
+    for element in xml_root:
+        print("PROCESSING ITEM: ", element.tag, element.attrib)        
         if element.tag == "Node":
-            new_frame = node_tree.nodes.new("NodeFrame")
-            new_frame.parent = parent 
-            new_frame.name = sanitize_name(element.get("name", "Unnamed"))
-            new_frame.label = new_frame.name
-            
-            import_node(element, new_frame, node_tree)
+            node = node_tree.nodes.new("NodeFrame")
+            node.parent = parent 
+            node.name = sanitize_name(element.get("name", "Unnamed"))
+            node.label = node.name
+            import_node(element, node, node_tree)
         else:
             node = node_tree.nodes.new("CustomObject")
             node.type = element.tag 
@@ -522,8 +556,8 @@ def import_node(root, parent, node_tree):
                     if name != "name":
                         s = node.inputs.new(name=name, type="NodeSocketString")
                         s.default_value = value
-
             node.parent = parent  
+        
 
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import StringProperty
@@ -548,7 +582,7 @@ class NODE_OT_sofa_scene_import(bpy.types.Operator, ImportHelper):
         frame.label = self.filepath
         import_node(root, frame, node_tree)        
 
-        resolve_all_pending_link(node_tree)
+        #resolve_all_pending_link(node_tree)
 
         layout = minilayout.MiniDAGLayout(node_tree)
         layout.apply()
@@ -572,6 +606,75 @@ class MESH_OT_sofa_export(MESH_OT_sofa_prefab_export):
         
         return {"FINISHED"}
 
+
+
+# import importlib
+# import subprocess
+# import sys
+
+# package = "pyzmq"
+
+# try:
+#     importlib.import_module("zmq")
+# except ImportError:
+#     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+# import zmq
+# context = zmq.Context.instance()
+# socket = context.socket(zmq.PUSH)
+# socket.connect("tcp://localhost:5555")
+
+# def process_graph():
+#     try:
+   
+#         def get_my_trees():
+#             return [t for t in bpy.data.node_groups]
+#         nodes = get_my_trees()
+
+#         for node in nodes:
+#             if hasattr(nodes,"uid"):
+#                 print(f"nodes{getattr(node,'uid')} stream value {node}")
+
+#             socket.send_json({ "event": "node_tree_update"})
+#     except Exception as e:
+#         print("Error sending message to Sofa: ", e) 
+    
+#     #global graph_dirty
+#     #if graph_dirty:
+#     #    graph_dirty = False
+#     #    tree = bpy.context.space_data.node_tree
+#         #data = serialize_tree(tree)
+#         #zmq_sender.send(data)
+
+#     return 1.0
+
+# owner = object()
+
+# def node_tree_changed():
+#     pass
+#     #socket.send_json({
+#     #    "event": "node_tree_update"
+#     #})
+
+# is_started = False
+# def start_timer_once():
+#     global is_started
+#     if not is_started: 
+#         #bpy.app.timers.register(process_graph)  
+#         is_started = True
+
+# def subscribe():
+
+#     bpy.msgbus.subscribe_rna(
+#         key=(bpy.types.NodeTree, "nodes"),
+#         owner=owner,
+#         notify=node_tree_changed,
+#     )
+
+# def unsubscribe():
+#     bpy.msgbus.clear_by_owner(owner)
+
+
 class MESH_OT_sofa_prefab_run(MESH_OT_sofa_prefab_export):
     """Run the prefab in runSofa"""
 
@@ -585,8 +688,9 @@ class MESH_OT_sofa_prefab_run(MESH_OT_sofa_prefab_export):
         
         self.report({'INFO'}, 'Starting: runSofa {} -i'.format(output_filename))
         with working_directory(pathname):
-            subprocess.Popen(["runSofa", "-l", "SofaImGui,SofaPython3", output_filename]) 
-            
+            subprocess.Popen(["runSofa", "-l", "SofaImgui,SofaPython3", output_filename]) 
+            #start_timer_once()
+
         return {"FINISHED"}
 
 class MESH_OT_firefox_open(MESH_OT_sofa_prefab_export):
