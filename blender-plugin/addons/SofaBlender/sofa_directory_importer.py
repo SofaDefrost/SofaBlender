@@ -11,7 +11,42 @@ from math import sin, cos, atan2
 def sofa_get_new_path(old_pathname):
     return old_pathname[1:].replace("/",".")
 
-def load_sofa_object(object):
+def create_blender_material_from_sofa(mat_data):
+    """
+    Creates a material from the info found in the Sofa export
+    """
+    mat = bpy.data.materials.new(name=mat_data.get("name", "SofaMaterial"))
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    bsdf = nodes.get("Principled BSDF")
+    if not bsdf:
+        bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+
+    if 'diffuse' in mat_data:
+        rgba = mat_data['diffuse']
+        if len(rgba) == 4:
+            bsdf.inputs['Base Color'].default_value = rgba
+        elif len(rgba) == 3:
+            bsdf.inputs['Base Color'].default_value = rgba + [1.0]
+
+    return mat
+
+def get_blend_material(blend_file, mat_name):
+    """
+    Gets a material from a blend file
+    """
+    if mat_name not in bpy.data.materials:
+        if not os.path.isfile(blend_file):
+            print(f"[ERROR] Blend file not found: {blend_file}")
+            return None
+        with bpy.data.libraries.load(blend_file, link=False) as (data_src, data_dst):
+            if mat_name in data_src.materials:
+                data_dst.materials = [mat_name]
+            else:
+                print(f"Material '{mat_name}' not found in {blend_file}")
+    return bpy.data.materials.get(mat_name)
+
+def load_sofa_object(object, root_path):
     sname = object["name"]
     sclass = object["class"]
     
@@ -22,6 +57,28 @@ def load_sofa_object(object):
     bobject["sofa_name"] = sname
     bobject["sofa_type"] = sclass
     bobject["sofa_pathname"] = object["path"]
+
+    mat = None
+
+    mat_data = object.get("material")
+    blend_file = object.get("blend_file")
+    mat_name = object.get("material_name")
+
+    blend_path = None
+
+    if blend_file and mat_name:
+        blend_path = os.path.normpath(os.path.join(root_path, blend_file))
+        if not os.path.isfile(blend_path):
+            print(f"[ERROR] Blend file not found: {blend_file}")
+        mat = get_blend_material(blend_path, mat_name)
+    else:
+        mat = create_blender_material_from_sofa(mat_data)
+
+    if mat:
+        if bobject.data.materials:
+            bobject.data.materials[0] = mat
+        else:
+            bobject.data.materials.append(mat)
     
     return bobject
 
@@ -39,7 +96,7 @@ def get_filepath(value, frame, basedir):
     
     return os.path.join(basedir, outfilename)
     
-def load_sofa_node(node, blendernode, cache):
+def load_sofa_node(node, blendernode, cache, root_path):
     name = node["name"]
     path = node["path"]
     
@@ -53,11 +110,11 @@ def load_sofa_node(node, blendernode, cache):
         blendernode.children.link(new_node)
     
     for child in node["children"]:
-        load_sofa_node(child, new_node, cache)
+        load_sofa_node(child, new_node, cache, root_path)
     
     for object in node["objects"]:
         if object["path"] not in cache:
-            child_object = load_sofa_object(object)
+            child_object = load_sofa_object(object, root_path)
             new_node.objects.link(child_object)
     return new_node
 
@@ -128,7 +185,7 @@ def load_bake_directory(pathdir="__sofa_cache__"):
     rootnode = json.loads(open(scenefilename, "rb").read())
     
     cache = blender_sofa_tree(sceneroot, {})
-    load_sofa_node(rootnode, sceneroot, cache)
+    load_sofa_node(rootnode, sceneroot, cache, pathdir)
     
     cache = blender_sofa_tree(sceneroot, {})
     load_baked_objects_at_frame(0, sceneroot, cache, pathdir)
