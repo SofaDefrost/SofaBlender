@@ -27,12 +27,72 @@ def get_filepath(value, frame, basedir):
     return os.path.join(basedir, outfilename)  
 
 def save_object(object):
-    return {
+    base_data = {
         "name" : object.name.value,
         "path" : str(object.linkpath),
         "class" : object.getClassName(),
         "type" : object.getTemplateName()
     }
+
+    if object.getClassName() == "OglModel":
+        material_data = {}
+
+        material_fields = ["material", "diffuse", "specular", "ambient", "emissive",
+                           "shininess", "transparency", "texture"]
+
+        for field in material_fields:
+            if field in object.__data__:
+                material_data[field] = object.getData(field).value
+
+        if "material" in material_data and isinstance(material_data["material"], str):
+            material_data = parse_sofa_material_string(material_data["material"])
+
+        if material_data:
+            base_data["material"] = material_data
+
+    return base_data
+
+def parse_sofa_material_string(mat_str):
+    parts = mat_str.split()
+    result = {}
+
+    if not parts:
+        return result
+    result['name'] = parts[0]
+    i = 1
+
+    prop_map = {
+        "Diffuse 1": ("diffuse", 4),
+        "Ambient 1": ("ambient", 4),
+        "Specular 1": ("specular", 4),
+        "Emissive": ("emissive", 4),
+        "Shininess": ("shininess", 2),
+        "Transparency": ("transparency", 1)
+    }
+
+    while i < len(parts):
+        matched = False
+
+        if i + 1 < len(parts):
+            key = f"{parts[i]} {parts[i+1]}"
+            if key in prop_map:
+                out_key, n_vals = prop_map[key]
+                vals = [float(parts[i + 2 + j]) for j in range(n_vals)]
+                result[out_key] = vals
+                i += 2 + n_vals
+                matched = True
+        if not matched:
+            if parts[i] in prop_map:
+                out_key, n_vals = prop_map[parts[i]]
+                vals = [float(parts[i+1+j]) for j in range(n_vals)]
+                result[out_key] = vals
+                i += 1 + n_vals
+                matched = True
+        if not matched:
+            i += 1
+            
+    return result
+    
 
 def save_node(node):
     n = {
