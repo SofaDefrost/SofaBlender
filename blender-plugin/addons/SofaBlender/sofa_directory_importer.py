@@ -6,7 +6,6 @@ except:
     import json
 import hashlib
 import os
-from math import sin, cos, atan2
 
 def sofa_get_new_path(old_pathname):
     return old_pathname[1:].replace("/",".")
@@ -15,7 +14,7 @@ def create_blender_material_from_sofa(mat_data):
     """
     Creates a material from the info found in the Sofa export
     """
-    mat = bpy.data.materials.new(name=mat_data.get("name", "SofaMaterial"))
+    mat = bpy.data.materials.new(name=mat_data.get("name"))
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
     bsdf = nodes.get("Principled BSDF")
@@ -46,41 +45,45 @@ def get_blend_material(blend_file, mat_name):
                 print(f"Material '{mat_name}' not found in {blend_file}")
     return bpy.data.materials.get(mat_name)
 
+
+def apply_material(bobject, mat):
+    if bobject.data.materials:
+        bobject.data.materials[0] = mat
+    else:
+        bobject.data.materials.append(mat)
+
+
 def load_sofa_object(object, root_path):
     sname = object["name"]
     sclass = object["class"]
-    
-    bname = "{} ({})".format(sname, sclass)
-    bmesh = bpy.data.meshes.new(sname)    
-    bobject = bpy.data.objects.new(bname, bmesh) 
-    bobject.name = bname
+
+    bmesh = bpy.data.meshes.new(sname)
+    bobject = bpy.data.objects.new(sname, bmesh)
+    bobject.name = sname
     bobject["sofa_name"] = sname
     bobject["sofa_type"] = sclass
     bobject["sofa_pathname"] = object["path"]
 
-    mat = None
-
     mat_data = object.get("material")
+
     blend_file = object.get("blend_file")
     mat_name = object.get("material_name")
-
-    blend_path = None
+    obj_name = object.get("obj_name")
 
     if blend_file and mat_name:
         blend_path = os.path.normpath(os.path.join(root_path, blend_file))
         if not os.path.isfile(blend_path):
             print(f"[ERROR] Blend file not found: {blend_file}")
         mat = get_blend_material(blend_path, mat_name)
-    else:
+        obj = bpy.data.objects[obj_name]
+        apply_material(obj, mat)
+    elif mat_data:
         mat = create_blender_material_from_sofa(mat_data)
+        apply_material(bobject, mat)
 
-    if mat:
-        if bobject.data.materials:
-            bobject.data.materials[0] = mat
-        else:
-            bobject.data.materials.append(mat)
-    
+
     return bobject
+
 
 def get_hash_digest(value):
     m = hashlib.md5()
