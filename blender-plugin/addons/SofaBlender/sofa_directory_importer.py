@@ -57,13 +57,13 @@ def load_sofa_object(object, root_path):
     sname = object["name"]
     sclass = object["class"]
 
+    bname = "{} ({})".format(sname, sclass)
     bmesh = bpy.data.meshes.new(sname)
-    bobject = bpy.data.objects.new(sname, bmesh)
-    bobject.name = sname
+    bobject = bpy.data.objects.new(bname, bmesh)
+    bobject.name = bname
     bobject["sofa_name"] = sname
     bobject["sofa_type"] = sclass
     bobject["sofa_pathname"] = object["path"]
-
     mat_data = object.get("material")
 
     blend_file = object.get("blend_file")
@@ -235,33 +235,34 @@ def load_baked_object_at_frame(frame, mesh, basedir):
                 topology["quads"] = values
             else: 
                 # https://docs.blender.org/api/current/bpy_types_enum_items/attribute_type_items.html#rna-enum-attribute-type-items
-                if isinstance(values[0], list): 
-                    if len(values[0]) == 2:
-                        extra_vertex_data.append({"name" : name,
-                                                  "type" : "FLOAT2",
-                                                  "domain" : "POINT",
-                                                  "data" : values
-                                                  })
-                    elif len(values[0]) == 3:
-                        extra_vertex_data.append({"name" : name,
-                                                  "type" : "FLOAT_VECTOR",
-                                                  "domain" : "POINT",
-                                                  "data" : values
-                                                  })
-                    elif len(values[0]) == 4:
-                        extra_vertex_data.append({"name" : name,
-                                                  "type" : "FLOAT_COLOR",
-                                                  "domain" : "POINT",
-                                                  "data" : values
-                                                  })    
+                if len(values) != 0:
+                    if isinstance(values[0], list):
+                        if len(values[0]) == 2:
+                            extra_vertex_data.append({"name" : name,
+                                                    "type" : "FLOAT2",
+                                                    "domain" : "POINT",
+                                                    "data" : values
+                                                    })
+                        elif len(values[0]) == 3:
+                            extra_vertex_data.append({"name" : name,
+                                                    "type" : "FLOAT_VECTOR",
+                                                    "domain" : "POINT",
+                                                    "data" : values
+                                                    })
+                        elif len(values[0]) == 4:
+                            extra_vertex_data.append({"name" : name,
+                                                    "type" : "FLOAT_COLOR",
+                                                    "domain" : "POINT",
+                                                    "data" : values
+                                                    })
+                        else:
+                            print("Unsupported type structure. Please report: ", name, values[0])
                     else:
-                        print("Unsupported type structure. Please report: ", name, values[0])
-                else:
-                    extra_vertex_data.append({"name" : name,
-                                              "type" : "FLOAT",
-                                              "domain" : "POINT",
-                                              "data" : values
-                                              })
+                        extra_vertex_data.append({"name" : name,
+                                                "type" : "FLOAT",
+                                                "domain" : "POINT",
+                                                "data" : values
+                                                })
 
         if len(position) == 0:
             max_idx = -1
