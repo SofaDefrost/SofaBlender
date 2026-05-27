@@ -68,14 +68,14 @@ def load_sofa_object(object, root_path):
 
     blend_file = object.get("blend_file")
     mat_name = object.get("material_name")
-    obj_name = object.get("obj_name")
+    target_path = object.get("target_path")
 
     if blend_file and mat_name:
         blend_path = os.path.normpath(os.path.join(root_path, blend_file))
         if not os.path.isfile(blend_path):
             print(f"[ERROR] Blend file not found: {blend_file}")
         mat = get_blend_material(blend_path, mat_name)
-        obj = bpy.data.objects[obj_name]
+        obj = bpy.data.objects[target_path]
         apply_material(obj, mat)
     elif mat_data:
         mat = create_blender_material_from_sofa(mat_data)
