@@ -4,6 +4,7 @@ import importlib
 import hashlib
 import os
 import sys
+import shutil
 import signal
 try: 
     import orjson as json
@@ -144,7 +145,15 @@ class BlenderMaterial(Sofa.Core.Controller):
                      value=kwargs.get("target_path", "")
                      )
         
-        
+       
+class BlenderLight(Sofa.Core.Controller):
+    def __init__(self, *args, **kwargs):
+        Sofa.Core.Controller.__init__(self, *args, **kwargs)
+
+        self.addData(name="type", type="string", value=kwargs.get("type", "SUN"))
+        self.addData(name="energy", type="float", value=kwargs.get("energy", 3.0))
+        self.addData(name="position", type="string", value=kwargs.get("position", "0 0 0")) 
+
 class BlenderExporter(Sofa.Core.Controller):
     def __init__(self, *args, **kwargs):
         Sofa.Core.Controller.__init__(self, *args, **kwargs)
@@ -164,7 +173,11 @@ class BlenderExporter(Sofa.Core.Controller):
             shutil.rmtree(self.base_dir, ignore_errors=True)
 
         if not os.path.exists(self.base_dir):
-            os.mkdir(self.base_dir)    
+            os.mkdir(self.base_dir) 
+        current_dir = os.path.dirname(__file__)
+        source_blend = os.path.join(current_dir, "library.blend")
+        dest_blend = os.path.join(self.base_dir, "library.blend")
+        shutil.copy(source_blend, dest_blend)   
         save_config(self.root, self.base_dir)
 
     def dump_at_time(self, dt):
@@ -278,8 +291,8 @@ def createScene(root):
     BlenderMaterial(
         name="BlenderMaterial",
         blend_file="library.blend",
-        material_name="plastic_01",
-        target_path=""
+        material_name="plastic_02",
+        target_path="VisualModel2"
     )
     )
 
