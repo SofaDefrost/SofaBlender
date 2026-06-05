@@ -284,9 +284,9 @@ def createScene(root):
         print("  object ", object.getPathName())
     root.addObject(
     BlenderMaterial(
-        name="BlenderMaterial",
+        name="VisualModel2",
         blend_file="library.blend",
-        material_name="plastic_02",
+        material_name="plastic_03",
         target_path="VisualModel2"
     )
     )
