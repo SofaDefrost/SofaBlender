@@ -10,22 +10,10 @@ import os
 def sofa_get_new_path(old_pathname):
     return old_pathname[1:].replace("/",".")
 
-def preload_material_library(blend_file):
-    if not os.path.isfile(blend_file):
-        print("[ERROR] Library not found")
-        return
-
-    with bpy.data.libraries.load(blend_file, link=False) as (data_src, data_dst):
-        print("Materials found in file:", data_src.materials)
-        data_dst.materials = list(data_src.materials)
-
-    print("Materials in Blender after load:")
-    for m in bpy.data.materials:
-        print(" -", m.name)
 
 def create_blender_material_from_sofa(mat_data):
     """
-    Creates a material from the info found in the Sofa export
+    Creates a material from the info found in the Sofa export and save it in a list 
     """
     mat = bpy.data.materials.new(name=mat_data.get("name"))
     mat.use_nodes = True
@@ -44,8 +32,24 @@ def create_blender_material_from_sofa(mat_data):
     return mat
 
 
+def get_blend_material(blend_file, mat_name):
+    """
+    Gets a material from a blend file
+    """
+    if mat_name not in bpy.data.materials:
+        if not os.path.isfile(blend_file):
+            print(f"[ERROR] Blend file not found: {blend_file}")
+            return None
+        with bpy.data.libraries.load(blend_file, link=False) as (data_src, data_dst):
+            if mat_name in data_src.materials:
+                data_dst.materials = [mat_name]
+            else:
+                print(f"Material '{mat_name}' not found in {blend_file}")
+    return bpy.data.materials.get(mat_name)
+
 
 def apply_material(bobject, mat):
+    """ aplly the material to the corresponding object """
     if bobject.data.materials:
         bobject.data.materials[0] = mat
     else:
@@ -53,6 +57,7 @@ def apply_material(bobject, mat):
 
 
 def load_sofa_object(object, root_path):
+    
     sname = object["name"]
     sclass = object["class"]
 
@@ -67,9 +72,12 @@ def load_sofa_object(object, root_path):
     blend_file = object.get("blend_file")
     mat_name = object.get("material_name")
     obj_name = object.get("obj_name")
-
     if blend_file and mat_name:
-        mat = bpy.data.materials.get(mat_name)
+        blend_path = os.path.normpath(os.path.join(root_path, blend_file))
+        if not os.path.isfile(blend_path):
+            print(f"[ERROR] Blend file not found: {blend_file}")
+        mat = get_blend_material(blend_path, mat_name)
+        obj = bpy.data.objects[obj_name]
         apply_material(bobject, mat)
     elif mat_data:
         mat = create_blender_material_from_sofa(mat_data)
@@ -162,8 +170,9 @@ def remove_baked_simulation():
     collection = bpy.data.collections.get(name)
     remove_collection(collection)
 
+
+
 def load_bake_directory(pathdir="__sofa_cache__"):
-    preload_material_library(os.path.join(pathdir, "library.blend"))
     scenefilename = os.path.join(pathdir, "scene.json")
     directoryname = os.path.basename(os.path.normpath(pathdir))
 
@@ -187,6 +196,7 @@ def load_bake_directory(pathdir="__sofa_cache__"):
     
     cache = blender_sofa_tree(sceneroot, {})
     load_baked_objects_at_frame(0, sceneroot, cache, pathdir)
+
 
 def load_baked_object_at_frame(frame, mesh, basedir):
     if "sofa_pathname" not in mesh:
