@@ -28,6 +28,8 @@ def get_filepath(value, frame, basedir):
     return os.path.join(basedir, outfilename)  
 
 def save_object(object):
+    """save de object and his different parameter"""
+    list_material_name = []
     base_data = {
         "name" : object.name.value,
         "path" : str(object.linkpath),
@@ -36,6 +38,7 @@ def save_object(object):
     }
     if "material_name" in object.__data__:
         base_data["material_name"] = object.getData("material_name").value
+        
     if "blend_file" in object.__data__:
         base_data["blend_file"] = object.getData("blend_file").value
     if "target_path" in object.__data__:
@@ -146,14 +149,6 @@ class BlenderMaterial(Sofa.Core.Controller):
                      )
         
        
-class BlenderLight(Sofa.Core.Controller):
-    def __init__(self, *args, **kwargs):
-        Sofa.Core.Controller.__init__(self, *args, **kwargs)
-
-        self.addData(name="type", type="string", value=kwargs.get("type", "SUN"))
-        self.addData(name="energy", type="float", value=kwargs.get("energy", 3.0))
-        self.addData(name="position", type="string", value=kwargs.get("position", "0 0 0")) 
-
 class BlenderExporter(Sofa.Core.Controller):
     def __init__(self, *args, **kwargs):
         Sofa.Core.Controller.__init__(self, *args, **kwargs)
@@ -241,7 +236,7 @@ class CommandLineParse(object):
     def __getitem__(self, key):
         return self.args[key][0]
     
-def createScene(root):    
+def createScene(root): 
     parser = CommandLineParse()
     parser.add_argument("filename", "", "The file name for the scene to export")
     parser.add_argument("fps", 24, "Number of frame per second")
