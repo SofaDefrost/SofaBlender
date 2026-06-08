@@ -6,6 +6,7 @@ import os
 import sys
 import shutil
 import signal
+import materials
 try: 
     import orjson as json
 except:
@@ -114,7 +115,7 @@ def save_sofa_state(frame, object_rule, basedir):
 def get_all_objects(selection_rule, node, out):
     typename, pathname, datafields = selection_rule
     for object in node.objects:
-        if object.getClassName() == typename:
+        if typename in object.getClassName():
             if pathname == "*" or object.getPathName() == pathname:
                 if object.getPathName() not in out:
                     out[object.getPathName()] = (object, datafields)
@@ -282,14 +283,7 @@ def createScene(root):
     for key, object_sel in objects.items():
         object, datafields = object_sel
         print("  object ", object.getPathName())
-    root.addObject(
-    BlenderMaterial(
-        name="VisualModel2",
-        blend_file="library.blend",
-        material_name="plastic_03",
-        target_path="VisualModel2"
-    )
-    )
+    materials.add_materials(root, objects)
 
     root.addObject(BlenderExporter(name="BlenderExporter", root=root, objects=objects.values(), 
                                                            fps=fps, timing=parser["timing"], 
