@@ -30,21 +30,23 @@ def get_filepath(value, frame, basedir):
 
 def save_object(object):
     """save de object and his different parameter"""
-    list_material_name = []
     base_data = {
         "name" : object.name.value,
         "path" : str(object.linkpath),
         "class" : object.getClassName(),
         "type" : object.getTemplateName()
     }
-    if "material_name" in object.__data__:
-        base_data["material_name"] = object.getData("material_name").value
-        
-    if "blend_file" in object.__data__:
-        base_data["blend_file"] = object.getData("blend_file").value
-    if "target_path" in object.__data__:
-        base_data["target_path"] = object.getData("target_path").value
-
+    if "material_name" in object.__data__: 
+       base_data["material_name"] = object.getData("material_name").value 
+       if "blend_file" in object.__data__: 
+           base_data["blend_file"] = object.getData("blend_file").value 
+       if "target_path" in object.__data__: 
+           base_data["target_path"] = object.getData("target_path").value
+    
+    elif object.getClassName() == "OglModel":
+        base_data["material_name"] = "plastic_01"
+        base_data["blend_file"] = "library.blend"
+        base_data["target_path"] = str(object.linkpath)
     return base_data
 
     

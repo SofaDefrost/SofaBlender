@@ -6,7 +6,7 @@ except:
     import json
 import hashlib
 import os
-
+MATERIAL_COMMANDS = []
 def sofa_get_new_path(old_pathname):
     return old_pathname[1:].replace("/",".")
 
@@ -60,7 +60,13 @@ def load_sofa_object(object, root_path):
     
     sname = object["name"]
     sclass = object["class"]
-
+    if sclass == "BlenderMaterial":
+        MATERIAL_COMMANDS.append({
+        "target_path": object["target_path"],
+        "blend_file": object["blend_file"],
+        "material_name": object["material_name"]
+        })
+        return None
     bname = "{} ({})".format(sname, sclass)
     bmesh = bpy.data.meshes.new(sname)
     bobject = bpy.data.objects.new(bname, bmesh)
@@ -90,6 +96,26 @@ def load_sofa_object(object, root_path):
         apply_material(bobject, mat)
 
     return bobject
+
+def apply_material_commands(root_path):
+
+    for cmd in MATERIAL_COMMANDS:
+
+        blend_path = os.path.join(
+            root_path,
+            cmd["blend_file"]
+        )
+        mat = get_blend_material(
+            blend_path,
+            cmd["material_name"]
+        )
+        if not mat:
+            continue
+        target_path = cmd["target_path"]
+        for obj in bpy.data.objects:
+            if obj.get("sofa_pathname") == target_path:
+                apply_material(obj, mat)
+                break
 
 
 def get_hash_digest(value):
@@ -125,7 +151,8 @@ def load_sofa_node(node, blendernode, cache, root_path):
     for object in node["objects"]:
         if object["path"] not in cache:
             child_object = load_sofa_object(object, root_path)
-            new_node.objects.link(child_object)
+            if child_object is not None:
+                new_node.objects.link(child_object)
     return new_node
 
 def blender_sofa_tree(collection, out):
@@ -201,7 +228,7 @@ def load_bake_directory(pathdir="__sofa_cache__"):
     
     cache = blender_sofa_tree(sceneroot, {})
     load_baked_objects_at_frame(0, sceneroot, cache, pathdir)
-
+    apply_material_commands(pathdir)
 
 def load_baked_object_at_frame(frame, mesh, basedir):
     if "sofa_pathname" not in mesh:
@@ -330,4 +357,5 @@ def load_baked_object_at_frame(frame, mesh, basedir):
 def load_baked_objects_at_frame(frame, blender_root, cache, basedir):
     for object in cache.values():
         load_baked_object_at_frame(frame, object, basedir)
+    
     
