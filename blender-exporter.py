@@ -5,11 +5,11 @@ import hashlib
 import os
 import sys
 import signal
-try: 
+try:
     import orjson as json
 except:
     print("Unable to load orjson, fallback to 'json' python implementation (slower)")
-    import json 
+    import json
 import shutil
 import time
 
@@ -23,8 +23,8 @@ def get_hash_digest(value):
 def get_filepath(value, frame, basedir):
     md5 = get_hash_digest(value)
     outfilename = f"{md5}_{frame}.json"
-    
-    return os.path.join(basedir, outfilename)  
+
+    return os.path.join(basedir, outfilename)
 
 def save_object(object):
     base_data = {
@@ -36,6 +36,7 @@ def save_object(object):
     if object.getClassName() == "BlenderMaterial":
         base_data["blend_file"] = object.getData("blend_file").value
         base_data["material_name"] = object.getData("material_name").value
+        base_data["target_path"] = object.getData("target_path").value
 
     if object.getClassName() == "OglModel":
         material_data = {}
@@ -93,9 +94,9 @@ def parse_sofa_material_string(mat_str):
                 matched = True
         if not matched:
             i += 1
-            
+
     return result
-    
+
 
 def save_node(node):
     n = {
@@ -115,19 +116,19 @@ def save_node(node):
 
 def save_config(root, basedir):
     destfile = os.path.join(basedir, "scene.json")
-    with open(destfile, "w") as w:
+    with open(destfile, "wb") as w:
         w.write(json.dumps(save_node(root)))
 
 def save_sofa_state(frame, object_rule, basedir):
-    object, datafields = object_rule 
+    object, datafields = object_rule
     fullpathname = get_filepath(str(object.linkpath), frame, basedir)
-    
+
     if datafields == "*":
         vertices = object.position.value
         edges = []
         triangles = []
         quads = []
-    
+
         if "vertices" in object.__data__ and len(object.vertices) != 0:
             vertices = object.vertices.value
 
@@ -137,17 +138,17 @@ def save_sofa_state(frame, object_rule, basedir):
         if "triangles" in object.__data__:
             triangles = object.triangles.value
 
-        if "quads" in object.__data__:        
+        if "quads" in object.__data__:
             quads = object.quads.value
 
-        with open(fullpathname, "w") as f:
+        with open(fullpathname, "wb") as f:
             f.write(json.dumps({
               "frame": frame,
               "position": vertices.tolist() if hasattr(vertices, "tolist") else vertices,
               "edges": edges.tolist() if hasattr(edges, "tolist") else edges,
               "triangles": triangles.tolist() if hasattr(triangles, "tolist") else triangles,
               "quads": quads.tolist() if hasattr(quads, "tolist") else quads
-            }))    
+            }))
     else:
         tmp = {"frame" : frame}
         datafields = datafields.replace(" ","")
@@ -157,7 +158,7 @@ def save_sofa_state(frame, object_rule, basedir):
             else:
                 raise Exception("Unable to find data field named ", datafield, " in ", object.getPathName())
 
-        with open(fullpathname, "w") as f:
+        with open(fullpathname, "wb") as f:
             f.write(json.dumps(tmp, option=json.OPT_SERIALIZE_NUMPY))
 
 def get_all_objects(selection_rule, node, out):
@@ -171,10 +172,10 @@ def get_all_objects(selection_rule, node, out):
         get_all_objects(selection_rule, child, out)
     return out
 
-def bake_sofa_simulation(sofa_root, objects_to_bake, current_frame, basedir):    
+def bake_sofa_simulation(sofa_root, objects_to_bake, current_frame, basedir):
     for object in objects_to_bake:
         save_sofa_state(current_frame, object, basedir)
-        
+
     print("    - sofa simulation terminated at {}".format({sofa_root.time.value}))
 
 class BlenderExporter(Sofa.Core.Controller):
@@ -188,13 +189,13 @@ class BlenderExporter(Sofa.Core.Controller):
         self.current_time = 0
         self.time_last_frame_was_emitted = 0
         self.base_dir = kwargs.get("base_dir", [])
-        self.start_time = time.time() 
+        self.start_time = time.time()
 
         if os.path.exists(self.base_dir):
             shutil.rmtree(self.base_dir)
 
         if not os.path.exists(self.base_dir):
-            os.mkdir(self.base_dir)    
+            os.mkdir(self.base_dir)
         save_config(self.root, self.base_dir)
 
     def dump_at_time(self, dt):
@@ -202,11 +203,11 @@ class BlenderExporter(Sofa.Core.Controller):
             print("Saving animation step ", self.current_time)
             bake_sofa_simulation(self.root, self.objects, self.current_frame, self.base_dir)
             self.current_frame +=1
-            self.time_last_frame_was_emitted += self.delta_time 
+            self.time_last_frame_was_emitted += self.delta_time
         self.current_time += dt
 
     def onAnimateEndEvent(self, params):
-        dt = params["dt"]   
+        dt = params["dt"]
         if self.timing == "simulation":
             self.dump_at_time(dt)
         else :
@@ -224,9 +225,9 @@ def load_in(root, file):
         oroot.removeObject(object)
         root.addObject(object)
 
-    for child in chlds:   
+    for child in chlds:
         oroot.removeChild(child)
-    
+
     for name in oroot.__data__:
         root.getData(name).value = oroot.getData(name).value
 
@@ -235,7 +236,7 @@ def load_in(root, file):
 class CommandLineParse(object):
     def __init__(self):
         self.args = {}
-    
+
     def add_argument(self, name, default_value, help_message):
         self.args[name] = [default_value, help_message]
 
@@ -258,7 +259,7 @@ class CommandLineParse(object):
     def __getitem__(self, key):
         return self.args[key][0]
 
-def createScene(root):    
+def createScene(root):
     parser = CommandLineParse()
     parser.add_argument("filename", "", "The file name for the scene to export")
     parser.add_argument("fps", 24, "Number of frame per second")
@@ -273,7 +274,7 @@ def createScene(root):
     fps = float(parser["fps"])
     timing = parser["timing"]
     selection_file = parser["selection"]
-    
+
     filename, ext = os.path.splitext(sourcefile)
     if ext in [".py", ".pyscn"]:
         sys.path.append(os.path.dirname(filename))
@@ -293,7 +294,7 @@ def createScene(root):
             "pathname" : "*",
             "datafield" : "*"
             }]
-    else: 
+    else:
         selection_rules = json.loads(open(selection_file, "rt").read())
 
     objects = {}
@@ -305,8 +306,6 @@ def createScene(root):
         object, datafields = object_sel
         print("  object ", object.getPathName())
 
-    root.addObject(BlenderExporter(name="BlenderExporter", root=root, objects=objects.values(), 
-                                                           fps=fps, timing=parser["timing"], 
-                                                           base_dir=parser["basedir"])) 
-
-	
+    root.addObject(BlenderExporter(name="BlenderExporter", root=root, objects=objects.values(),
+                                                           fps=fps, timing=parser["timing"],
+                                                           base_dir=parser["basedir"]))
