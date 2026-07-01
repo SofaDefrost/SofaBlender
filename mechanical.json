@@ -1,0 +1,12 @@
+[
+    {
+        "classname" : "MechanicalObject",
+        "pathname" : "*",
+        "datafield" : "position,force"
+    },
+    {
+        "classname" : "OglModel",
+        "pathname" : "*",
+        "datafield" : "*"
+    }
+]
