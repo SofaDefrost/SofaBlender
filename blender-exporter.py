@@ -57,42 +57,52 @@ def save_object(object):
     return base_data
 
 def parse_sofa_material_string(mat_str):
+    """
+    Parses a string containing the material information of a basic material from Sofa
+    This is used as a fallback when there is no BlenderMaterial, as such it contains less information than a full PBR material
+
+    e.g. : We have "MyMaterial Material Diffuse 1 1.0 0.5 0.0 1.0 Shininess 128.0 1.0" as input
+           We return {'name': 'MyMaterial', 'diffuse': [1.0, 0.5, 0.0, 1.0], 'shininess': [128.0, 1.0]} as a python dictionnary, ready to be exported in JSON format
+    """
+    
     parts = mat_str.split()
     result = {}
 
     if not parts:
         return result
-    result['name'] = parts[0]
+    result['name'] = parts[0]                   # We assume the first token to be the Material name
     i = 1
 
+    # This map contains a tuple for each key : (<output dictionnary key>, <the number of floats to read>)
     prop_map = {
-        "Diffuse 1": ("diffuse", 4),
-        "Ambient 1": ("ambient", 4),
-        "Specular 1": ("specular", 4),
-        "Emissive": ("emissive", 4),
-        "Shininess": ("shininess", 2),
+        "Diffuse 1": ("diffuse", 4),            # [R, G, B, A]
+        "Ambient 1": ("ambient", 4),            # [R, G, B, A]
+        "Specular 1": ("specular", 4),          # [R, G, B, A]
+        "Emissive": ("emissive", 4),            # [R, G, B, A]
+        "Shininess": ("shininess", 2),          # [value, exponent]
         "Transparency": ("transparency", 1)
     }
 
+    # The actual parser logic
     while i < len(parts):
         matched = False
 
         if i + 1 < len(parts):
             key = f"{parts[i]} {parts[i+1]}"
             if key in prop_map:
-                out_key, n_vals = prop_map[key]
-                vals = [float(parts[i + 2 + j]) for j in range(n_vals)]
-                result[out_key] = vals
-                i += 2 + n_vals
+                out_key, n_vals = prop_map[key]                              # We output the key name and the number of floats in variables
+                vals = [float(parts[i + 2 + j]) for j in range(n_vals)]      # List comprehension to convert the next 'n_vals' tokens into floats
+                result[out_key] = vals                                       
+                i += 2 + n_vals                                              # We advance the index past the 2 words of the key + the data values read
                 matched = True
-        if not matched:
+        if not matched:                                                      # If our key doesn't exist in the map, it means we have a 1-word key
             if parts[i] in prop_map:
                 out_key, n_vals = prop_map[parts[i]]
-                vals = [float(parts[i+1+j]) for j in range(n_vals)]
-                result[out_key] = vals
-                i += 1 + n_vals
+                vals = [float(parts[i+1+j]) for j in range(n_vals)]          # List comprehension to convert the next 'n_vals' token into floats
+                result[out_key] = vals                                       
+                i += 1 + n_vals                                              # We advance the index past the only word of the key + the data values read
                 matched = True
-        if not matched:
+        if not matched:                                                      # If we don't match with a key from 'prop_map', then we skip this token and continue
             i += 1
 
     return result
