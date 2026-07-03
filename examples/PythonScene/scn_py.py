@@ -38,12 +38,11 @@ class BlenderMaterial(Sofa.Core.Controller):
             help="Path of the target model"
         )
 
-
 def createScene(root):
     root.name = "RootNode"
 
     # We load the .scn scene if needed
-    base_dir = "/home/l3miage/maxence.magras.etu/Documents/SOFA_v25.12.00_Linux"
+    base_dir = os.environ.get("SOFA_ROOT")
     scene_filename = os.path.join(base_dir, "share", "sofa", "examples", "Demos", "liver.scn")
 
     try:
