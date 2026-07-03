@@ -5,8 +5,15 @@ import Sofa.Simulation
 
 class BlenderMaterial(Sofa.Core.Controller):
     """
-    Custom Controller to describe a Blender Material inside a Sofa scene.
-    It is mandatory to define this class inside every python scene you want to make with Blender Materials
+    A SOFA Controller that contains some Material metadata for the Blender exporter.
+
+    This Controller holds :
+     - A .blend file name
+     - A material whose name is located into the .blend file
+     - A target path to the SOFA Object you want this material to be applied to
+
+    In the end, it will be used to automatically apply a material to a Blender object inside Blender.
+    It is mandatory to define this class inside every python scene you want to make with Blender Materials.
     """
     def __init__(self, *args, **kwargs):
         Sofa.Core.Controller.__init__(self, *args, **kwargs)
