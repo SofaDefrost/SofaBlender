@@ -10,6 +10,7 @@ import os
 def sofa_get_new_path(old_pathname):
     return old_pathname[1:].replace("/",".")
 
+
 def create_blender_material_from_sofa(mat_data):
     """
     Creates a material from the info found in the Sofa export
@@ -30,6 +31,7 @@ def create_blender_material_from_sofa(mat_data):
 
     return mat
 
+
 def find_object_by_sofa_path(target_path):
     """
     Searches for an object in the collections created by sofa using its path
@@ -37,24 +39,23 @@ def find_object_by_sofa_path(target_path):
     if not target_path:
         return None
 
-    target_name = clean_target.split('/')[-1]
+    target_collections = target_path.split('/')[1:]
+    target_name = target_path.split('/')[-1]
+    root_node = bpy.data.collections['RootNode']
+    current_node = root_node
+    
+    for collection_name in target_collections:
+        for child in current_node.children:
+            if child.name == collection_name:
+                current_node = child
+                break
 
-    def search_collection(collection):
-        for obj in collection.objects:
-            sofa_pathname = obj.get("sofa_pathname")
-            if sofa_pathname and sofa_pathname.lstrip('@') == clean_target:
-                return obj
-            if obj.get("sofa_name") == target_name:
-                return obj
+    for child in current_node.objects:
+        if child.name == f"{target_name} ({child.get("sofa_type")})":
+            return child
+    
+    return None
 
-        for child_collection in collection.children:
-            found_obj = search_collection(child_collection)
-            if found_obj:
-                return found_obj
-
-        return None
-
-    return search_collection(bpy.context.scene.collection)
 
 def get_blend_material(blend_file, mat_name):
     """
@@ -63,8 +64,9 @@ def get_blend_material(blend_file, mat_name):
     if mat_name not in bpy.data.materials:
         if not os.path.isfile(blend_file):
             print(f"[ERROR] Blend file not found: {blend_file}")
-            return None
-        with bpy.data.libraries.load(blend_file, link=False) as (data_src, data_dst):
+            return None    
+
+    with bpy.data.libraries.load(blend_file, link=False) as (data_src, data_dst):
             if mat_name in data_src.materials:
                 data_dst.materials = [mat_name]
             else:
@@ -86,10 +88,11 @@ def load_sofa_object(object, root_path):
     bname = "{} ({})".format(sname, sclass)
     bmesh = bpy.data.meshes.new(sname)
     bobject = bpy.data.objects.new(bname, bmesh)
-    bobject.name = bname
+    
     bobject["sofa_name"] = sname
     bobject["sofa_type"] = sclass
     bobject["sofa_pathname"] = object["path"]
+    
     mat_data = object.get("material")
 
     blend_file = object.get("blend_file")
@@ -102,21 +105,19 @@ def load_sofa_object(object, root_path):
             print(f"[ERROR] Blend file not found: {blend_file}")
 
         mat = get_blend_material(blend_path, mat_name)
-        apply_material(bpy.data.objects[target_path.split('/')[-1] + " (OglModel)"], mat)
-#        if mat:
-#            target_bobject = find_object_by_sofa_path(target_path)
-#
-#            if target_bobject:
-#                apply_material(target_bobject, mat)
-#            else:
-#                print(f"[ERROR] Cannot find the terget : {target_path}")
-        #else:
-        #    print(f"[ERROR] Cannot load material : {mat_name}")
+        if mat:
+            target_bobject = find_object_by_sofa_path(target_path)
+
+            if target_bobject:
+                apply_material(target_bobject, mat)
+            else:
+                print(f"[ERROR] Cannot find the target : {target_bobject}")
+        else:
+            print(f"[ERROR] Cannot load material : {mat_name}")
 
     elif mat_data:
         mat = create_blender_material_from_sofa(mat_data)
         apply_material(bobject, mat)
-
 
     return bobject
 
