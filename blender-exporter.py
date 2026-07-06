@@ -126,8 +126,8 @@ def save_node(node):
 
 def save_config(root, basedir):
     destfile = os.path.join(basedir, "scene.json")
-    with open(destfile, "w") as w:
-        w.write(json.dumps(save_node(root)))
+    with open(destfile, "wb") as w:
+        w.write(json.dumps(save_node(root)).encode("utf-8"))
 
 def save_sofa_state(frame, object_rule, basedir):
     object, datafields = object_rule
@@ -154,7 +154,7 @@ def save_sofa_state(frame, object_rule, basedir):
         if "quads" in object.__data__:
             quads = object.quads.value
 
-        with open(fullpathname, "w") as f:
+        with open(fullpathname, "wb") as f:
             f.write(json.dumps({
               "frame": frame,
               "position": vertices,
@@ -163,7 +163,7 @@ def save_sofa_state(frame, object_rule, basedir):
               "quads": quads
             },
             default=serialize_fallback,              # Since we cannot guarantee orjson is imported, we need to serealize the data
-            ))
+                               ).encode("utf-8"))
     else:
         tmp = {"frame" : frame}
         datafields = datafields.replace(" ","")
@@ -173,8 +173,8 @@ def save_sofa_state(frame, object_rule, basedir):
             else:
                 raise Exception("Unable to find data field named ", datafield, " in ", object.getPathName())
 
-        with open(fullpathname, "w") as f:
-            f.write(json.dumps(tmp, default=serialize_fallback))
+        with open(fullpathname, "wb") as f:
+            f.write(json.dumps(tmp, default=serialize_fallback).encode("utf-8"))
 
 def get_all_objects(selection_rule, node, out):
     typename, pathname, datafields = selection_rule
