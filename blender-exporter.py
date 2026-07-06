@@ -126,13 +126,16 @@ def save_node(node):
 
 def save_config(root, basedir):
     destfile = os.path.join(basedir, "scene.json")
-    with open(destfile, "wb") as w:
+    with open(destfile, "w") as w:
         w.write(json.dumps(save_node(root)))
 
 def save_sofa_state(frame, object_rule, basedir):
     object, datafields = object_rule
     fullpathname = get_filepath(str(object.linkpath), frame, basedir)
 
+    def serialize_fallback(obj):
+        return obj.tolist() if hasattr(obj, "tolist") else str(obj)
+    
     if datafields == "*":
         vertices = object.position.value
         edges = []
@@ -151,14 +154,16 @@ def save_sofa_state(frame, object_rule, basedir):
         if "quads" in object.__data__:
             quads = object.quads.value
 
-        with open(fullpathname, "wb") as f:
+        with open(fullpathname, "w") as f:
             f.write(json.dumps({
               "frame": frame,
-              "position": vertices.tolist() if hasattr(vertices, "tolist") else vertices,
-              "edges": edges.tolist() if hasattr(edges, "tolist") else edges,
-              "triangles": triangles.tolist() if hasattr(triangles, "tolist") else triangles,
-              "quads": quads.tolist() if hasattr(quads, "tolist") else quads
-            }))
+              "position": vertices,
+              "edges": edges,
+              "triangles": triangles,
+              "quads": quads
+            },
+            default=serialize_fallback,              # Since we cannot guarantee orjson is imported, we need to serealize the data
+            ))
     else:
         tmp = {"frame" : frame}
         datafields = datafields.replace(" ","")
@@ -168,8 +173,8 @@ def save_sofa_state(frame, object_rule, basedir):
             else:
                 raise Exception("Unable to find data field named ", datafield, " in ", object.getPathName())
 
-        with open(fullpathname, "wb") as f:
-            f.write(json.dumps(tmp, option=json.OPT_SERIALIZE_NUMPY))
+        with open(fullpathname, "w") as f:
+            f.write(json.dumps(tmp, default=serialize_fallback))
 
 def get_all_objects(selection_rule, node, out):
     typename, pathname, datafields = selection_rule
